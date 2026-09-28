@@ -48,6 +48,7 @@ systemctl restart vibework-max-api vibework-max-worker
 echo "[5/5] Verify services and Nginx configuration"
 systemctl --no-pager --full status vibework-max-api vibework-max-worker
 nginx -t
+systemctl reload nginx
 curl --fail --silent --show-error --max-time 10 http://127.0.0.1/health
 echo
 echo "=== VibeWork MAX native update complete $(date -Is) ==="
