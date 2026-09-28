@@ -7,7 +7,7 @@ export { buildServer };
 if (process.env.NODE_ENV !== 'test') {
   const app = buildServer();
   const port = Number(process.env.API_PORT ?? 3000);
-  await app.listen({ host: '0.0.0.0', port });
+  await app.listen({ host: process.env.API_HOST ?? '0.0.0.0', port });
 
   const close = async () => {
     await app.close();

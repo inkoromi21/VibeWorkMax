@@ -1,0 +1,24 @@
+[Unit]
+Description=VibeWork MAX API
+After=network-online.target postgresql.service redis-server.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=vibework
+Group=vibework
+WorkingDirectory=/opt/vibeworkmax
+EnvironmentFile=/etc/vibework-max/vibework-max.env
+ExecStart=/usr/bin/node apps/api/dist/index.js
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=30
+MemoryMax=300M
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=full
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+
+[Install]
+WantedBy=multi-user.target

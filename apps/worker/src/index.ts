@@ -49,7 +49,10 @@ if (process.env.NODE_ENV !== 'test') {
   void dispatch();
   const health = Fastify({ loggerInstance: logger });
   health.get('/health', () => ({ status: jobs.worker.isRunning() ? 'ok' : 'starting' }));
-  await health.listen({ host: '0.0.0.0', port: Number(process.env.WORKER_HEALTH_PORT ?? 3001) });
+  await health.listen({
+    host: process.env.WORKER_HEALTH_HOST ?? '0.0.0.0',
+    port: Number(process.env.WORKER_HEALTH_PORT ?? 3001),
+  });
 
   const close = async () => {
     await health.close();
