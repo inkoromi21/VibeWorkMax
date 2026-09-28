@@ -14,6 +14,7 @@ describe('MAX webhook', () => {
         publicBaseUrl: 'http://localhost:3000',
         secret: 'valid-secret',
         token: 'token',
+        identityEncryptionKey: Buffer.alloc(32, 1).toString('base64url'),
       }),
     ).toThrow();
     expect(() =>
@@ -21,6 +22,7 @@ describe('MAX webhook', () => {
         publicBaseUrl: 'https://bot.example',
         secret: 'valid-secret',
         token: 'token',
+        identityEncryptionKey: Buffer.alloc(32, 1).toString('base64url'),
       }),
     ).not.toThrow();
   });
@@ -125,6 +127,16 @@ describe('MAX webhook', () => {
     });
     expect(response.statusCode).toBe(503);
     await app.close();
+  });
+
+  it('encrypts the recipient before a MAX-enabled webhook reaches storage', () => {
+    const update = parseMaxUpdate(
+      { event_id: 'encrypted-1', type: 'message_created', user_id: 123456, text: 'hello' },
+      Buffer.alloc(32, 1).toString('base64url'),
+    );
+    expect(update.actorId).toBe('123456');
+    expect(update.encryptedRecipient).toMatch(/^v1\./);
+    expect(update.encryptedRecipient).not.toContain('123456');
   });
 
   it('leaves a committed event pending when queue handoff fails and retries on redelivery', async () => {

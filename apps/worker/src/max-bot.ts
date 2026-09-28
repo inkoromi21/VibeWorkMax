@@ -12,8 +12,9 @@ import type { Pool } from 'pg';
 interface StoredEvent {
   event_id: string;
   event_type: string;
-  payload: { text?: string; callback?: string };
+  payload: { text?: string; callback?: string; callback_id?: string };
   actor_id_hash: string;
+  encrypted_recipient: string | null;
 }
 interface StoredEventWithStatus extends StoredEvent {
   status: string;
@@ -21,10 +22,12 @@ interface StoredEventWithStatus extends StoredEvent {
 export interface BotReplyTransport {
   deliver(input: {
     deliveryId: string;
-    actorHash: string;
+    encryptedRecipient: string;
     text: string;
     buttons: { label: string; payload: string }[];
+    miniApp?: { label: string; url: string };
   }): Promise<void>;
+  acknowledgeCallback?(callbackId: string): Promise<void>;
 }
 /** Safe default while MAX credentials or legal policy are unavailable. */
 export class DisabledBotReplyTransport implements BotReplyTransport {
@@ -35,15 +38,17 @@ export class DisabledBotReplyTransport implements BotReplyTransport {
 export class MemoryBotReplyTransport implements BotReplyTransport {
   readonly sent: {
     deliveryId: string;
-    actorHash: string;
+    encryptedRecipient: string;
     text: string;
     buttons: { label: string; payload: string }[];
+    miniApp?: { label: string; url: string };
   }[] = [];
   deliver(input: {
     deliveryId: string;
-    actorHash: string;
+    encryptedRecipient: string;
     text: string;
     buttons: { label: string; payload: string }[];
+    miniApp?: { label: string; url: string };
   }): Promise<void> {
     if (!this.sent.some((item) => item.deliveryId === input.deliveryId)) this.sent.push(input);
     return Promise.resolve();
@@ -60,7 +65,7 @@ export async function processMaxUpdate(
   try {
     await client.query('BEGIN');
     const event = await client.query<StoredEventWithStatus>(
-      `SELECT event_id, event_type, payload, actor_id_hash, status FROM max_webhook_events WHERE event_id = $1 FOR UPDATE`,
+      `SELECT event_id, event_type, payload, actor_id_hash, encrypted_recipient, status FROM max_webhook_events WHERE event_id = $1 FOR UPDATE`,
       [eventId],
     );
     row = event.rows[0];
@@ -98,7 +103,9 @@ export async function processMaxUpdate(
     process.env.MAX_MINI_APP_URL,
   ).handle(command);
   await persistEffects(pool, row, transition);
-  await dispatchReplies(pool, row.actor_id_hash, eventId, transport);
+  if (row.payload.callback_id && transport.acknowledgeCallback)
+    await transport.acknowledgeCallback(row.payload.callback_id);
+  await dispatchReplies(pool, row.encrypted_recipient, eventId, transport);
   await pool.query(
     `UPDATE max_webhook_events SET status = 'PROCESSED', processed_at = now() WHERE event_id = $1 AND status <> 'PROCESSED'`,
     [eventId],
@@ -140,34 +147,69 @@ async function persistEffects(
 function safeReply(item: BotReply): {
   text: string;
   buttons: { label: string; payload: string }[];
+  miniApp?: { label: string; url: string };
 } {
-  return { text: item.text, buttons: item.buttons ?? [] };
+  return {
+    text: item.text,
+    buttons: item.buttons ?? [],
+    ...(item.miniApp === undefined ? {} : { miniApp: item.miniApp }),
+  };
 }
 
 async function dispatchReplies(
   pool: Pool,
-  actorHash: string,
+  encryptedRecipient: string | null,
   eventId: string,
   transport: BotReplyTransport,
 ): Promise<void> {
   const result = await pool.query<{
     id: string;
-    message: { text: string; buttons?: { label: string; payload: string }[] };
+    message: {
+      text: string;
+      buttons?: { label: string; payload: string }[];
+      miniApp?: { label: string; url: string };
+    };
   }>(
-    `SELECT id, message FROM bot_reply_outbox WHERE event_id = $1 AND status = 'PENDING' ORDER BY ordinal`,
+    `SELECT id, message FROM bot_reply_outbox
+     WHERE event_id = $1 AND (status = 'PENDING' OR (status = 'SENDING' AND claimed_at < now() - interval '5 minutes'))
+     ORDER BY ordinal`,
     [eventId],
   );
   for (const row of result.rows) {
-    await transport.deliver({
-      deliveryId: row.id,
-      actorHash,
-      text: row.message.text,
-      buttons: row.message.buttons ?? [],
-    });
-    await pool.query(
-      `UPDATE bot_reply_outbox SET status = 'DELIVERED', delivered_at = now() WHERE id = $1 AND status = 'PENDING'`,
+    const claimed = await pool.query(
+      `UPDATE bot_reply_outbox
+       SET status = 'SENDING', claimed_at = now(), delivery_attempts = delivery_attempts + 1, last_error_code = NULL
+       WHERE id = $1 AND (status = 'PENDING' OR (status = 'SENDING' AND claimed_at < now() - interval '5 minutes'))
+       RETURNING id`,
       [row.id],
     );
+    if (claimed.rowCount !== 1) continue;
+    if (!encryptedRecipient) {
+      await pool.query(
+        `UPDATE bot_reply_outbox SET status = 'PENDING', claimed_at = NULL, last_error_code = 'RECIPIENT_UNAVAILABLE' WHERE id = $1`,
+        [row.id],
+      );
+      throw new Error('MAX_RECIPIENT_UNAVAILABLE');
+    }
+    try {
+      await transport.deliver({
+        deliveryId: row.id,
+        encryptedRecipient,
+        text: row.message.text,
+        buttons: row.message.buttons ?? [],
+        ...(row.message.miniApp === undefined ? {} : { miniApp: row.message.miniApp }),
+      });
+      await pool.query(
+        `UPDATE bot_reply_outbox SET status = 'DELIVERED', delivered_at = now(), claimed_at = NULL WHERE id = $1 AND status = 'SENDING'`,
+        [row.id],
+      );
+    } catch (error) {
+      await pool.query(
+        `UPDATE bot_reply_outbox SET status = 'PENDING', claimed_at = NULL, last_error_code = $2 WHERE id = $1 AND status = 'SENDING'`,
+        [row.id, error instanceof Error ? error.name.slice(0, 100) : 'MAX_DELIVERY_FAILED'],
+      );
+      throw error;
+    }
   }
 }
 

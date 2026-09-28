@@ -4,4 +4,5 @@ export * from './idempotency.js';
 export * from './ids.js';
 export * from './jobs.js';
 export * from './logging.js';
+export * from './max-identity.js';
 export * from './trace.js';

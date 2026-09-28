@@ -145,6 +145,9 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
           ? {}
           : { secret: process.env.MAX_WEBHOOK_SECRET }),
         ...(process.env.MAX_BOT_TOKEN === undefined ? {} : { token: process.env.MAX_BOT_TOKEN }),
+        ...(process.env.MAX_IDENTITY_ENCRYPTION_KEY === undefined
+          ? {}
+          : { identityEncryptionKey: process.env.MAX_IDENTITY_ENCRYPTION_KEY }),
       });
     }
     if (
@@ -168,7 +171,10 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
         statusCode: 503,
         retryable: true,
       });
-    const update = parseMaxUpdate(request.body);
+    const update = parseMaxUpdate(
+      request.body,
+      process.env.MAX_MODE === 'enabled' ? process.env.MAX_IDENTITY_ENCRYPTION_KEY : undefined,
+    );
     const requireProviderEventId =
       options.requireMaxProviderEventId ?? process.env.MAX_MODE === 'enabled';
     if (requireProviderEventId && !update.hasProviderEventId) {

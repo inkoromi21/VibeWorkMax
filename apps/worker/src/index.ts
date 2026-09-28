@@ -4,12 +4,14 @@ import {
   MemoryNotificationTransport,
   consentPolicyFromEnvironment,
 } from '@vibework/domain';
-import { createLogger } from '@vibework/shared';
+import { assertMaxIdentityEncryptionKey, createLogger } from '@vibework/shared';
 import Fastify from 'fastify';
 import { Redis } from 'ioredis';
 import { Pool } from 'pg';
 import { createJobWorker } from './jobs.js';
 import { DisabledBotReplyTransport, gradeAttempt, processMaxUpdate } from './max-bot.js';
+import { MaxBotReplyTransport } from './max-reply-transport.js';
+import { MaxApiClient } from '../../api/src/max-client.js';
 
 export { createJobWorker };
 
@@ -19,12 +21,13 @@ if (process.env.NODE_ENV !== 'test') {
     maxRetriesPerRequest: null,
   });
   const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+  const botReplyTransport = createBotReplyTransport(logger);
   const jobs = createJobWorker(connection, logger, {
     processMaxUpdate: async (eventId) =>
       processMaxUpdate(
         pool,
         eventId,
-        new DisabledBotReplyTransport(),
+        botReplyTransport,
         consentPolicyFromEnvironment(),
       ),
     processAttemptGrade: async (reference) => gradeAttempt(pool, reference),
@@ -64,4 +67,19 @@ if (process.env.NODE_ENV !== 'test') {
   };
   process.once('SIGTERM', () => void close());
   process.once('SIGINT', () => void close());
+}
+
+function createBotReplyTransport(logger: ReturnType<typeof createLogger>) {
+  if (process.env.MAX_MODE !== 'enabled') return new DisabledBotReplyTransport();
+  const token = process.env.MAX_BOT_TOKEN;
+  const encryptionKey = process.env.MAX_IDENTITY_ENCRYPTION_KEY;
+  try {
+    if (!token) throw new Error('MAX_BOT_TOKEN is required');
+    assertMaxIdentityEncryptionKey(encryptionKey);
+    return new MaxBotReplyTransport(new MaxApiClient(token), encryptionKey);
+  } catch {
+    // Do not include any environment value or provider identity in this log.
+    logger.error('MAX reply transport disabled: configuration is incomplete or invalid');
+    return new DisabledBotReplyTransport();
+  }
 }

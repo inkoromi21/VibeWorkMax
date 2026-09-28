@@ -142,7 +142,7 @@ export class MaxApiClient {
   ) {}
 
   async sendMessage(input: {
-    userId?: number;
+    userId?: number | string;
     chatId?: number;
     text: string;
     attachments?: unknown[];

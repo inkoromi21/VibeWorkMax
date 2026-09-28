@@ -1,5 +1,9 @@
 import { createHash, timingSafeEqual } from 'node:crypto';
-import { ApplicationError } from '@vibework/shared';
+import {
+  ApplicationError,
+  assertMaxIdentityEncryptionKey,
+  encryptMaxRecipient,
+} from '@vibework/shared';
 import type { Pool } from 'pg';
 
 /** Narrow provider representation; MAX names the event field `update_type`. */
@@ -25,6 +29,8 @@ export interface StoredMaxUpdate {
   hasProviderEventId: boolean;
   type: string;
   actorId: string;
+  /** AES-GCM envelope; undefined only when MAX delivery is disabled. */
+  encryptedRecipient?: string;
   text?: string;
   callback?: string;
   callbackId?: string;
@@ -73,6 +79,7 @@ export function assertMaxWebhookConfiguration(input: {
   publicBaseUrl?: string;
   secret?: string;
   token?: string;
+  identityEncryptionKey?: string;
 }): void {
   if (!input.token || !input.secret || !/^[A-Za-z0-9_-]{5,256}$/.test(input.secret)) {
     throw new ApplicationError({
@@ -92,6 +99,15 @@ export function assertMaxWebhookConfiguration(input: {
     });
   }
   if (url.protocol !== 'https:' || (url.port !== '' && url.port !== '443')) {
+    throw new ApplicationError({
+      code: 'MAX_WEBHOOK_CONFIGURATION_INVALID',
+      message: 'MAX webhook не настроен',
+      statusCode: 503,
+    });
+  }
+  try {
+    assertMaxIdentityEncryptionKey(input.identityEncryptionKey);
+  } catch {
     throw new ApplicationError({
       code: 'MAX_WEBHOOK_CONFIGURATION_INVALID',
       message: 'MAX webhook не настроен',
@@ -135,7 +151,7 @@ export function verifyMaxWebhookSecret(
   );
 }
 
-export function parseMaxUpdate(value: unknown): StoredMaxUpdate {
+export function parseMaxUpdate(value: unknown, identityEncryptionKey?: string): StoredMaxUpdate {
   if (!value || typeof value !== 'object' || Array.isArray(value)) {
     throw new ApplicationError({
       code: 'INVALID_MAX_UPDATE',
@@ -187,6 +203,9 @@ export function parseMaxUpdate(value: unknown): StoredMaxUpdate {
     hasProviderEventId: providerId !== undefined,
     type,
     actorId: actor,
+    ...(identityEncryptionKey === undefined
+      ? {}
+      : { encryptedRecipient: encryptMaxRecipient(actor, identityEncryptionKey) }),
     ...(text === undefined ? {} : { text }),
     ...(callback === undefined ? {} : { callback }),
     ...(callbackId === undefined ? {} : { callbackId }),
@@ -222,9 +241,15 @@ export class PostgresMaxWebhookStore implements MaxWebhookStore {
     try {
       await client.query('BEGIN');
       const inserted = await client.query(
-        `INSERT INTO max_webhook_events(event_id, actor_id_hash, event_type, payload)
-         VALUES ($1,$2,$3,$4) ON CONFLICT(event_id) DO NOTHING`,
-        [update.eventId, digestActor(update.actorId), update.type, payload],
+        `INSERT INTO max_webhook_events(event_id, actor_id_hash, event_type, payload, encrypted_recipient)
+         VALUES ($1,$2,$3,$4,$5) ON CONFLICT(event_id) DO NOTHING`,
+        [
+          update.eventId,
+          digestActor(update.actorId),
+          update.type,
+          payload,
+          update.encryptedRecipient ?? null,
+        ],
       );
       if (inserted.rowCount === 1) {
         await client.query(

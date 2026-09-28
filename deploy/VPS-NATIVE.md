@@ -50,6 +50,14 @@ ANALYTICS_MODE=disabled
 NOTIFICATION_MODE=disabled
 ```
 
+To enable MAX, set `MAX_MODE=enabled` together with `MAX_BOT_TOKEN`,
+`MAX_WEBHOOK_SECRET`, `PUBLIC_BASE_URL=https://vibeworkrussia.ru`,
+`MAX_MINI_APP_URL=https://vibeworkrussia.ru`, and a 32-byte base64url
+`MAX_IDENTITY_ENCRYPTION_KEY`. The token and encryption key stay only in this
+root-owned environment file. MAX requires calls to `platform-api2.max.ru` and
+may require the Минцифры root certificate to be trusted by the VPS OS; verify
+that trust before enabling the systemd services.
+
 Create the PostgreSQL role and database using the same password, then install
 the service definitions and site configuration:
 
