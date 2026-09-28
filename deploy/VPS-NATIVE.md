@@ -15,20 +15,10 @@ The host needs Ubuntu/Debian packages `postgresql`, `redis-server`, `nginx`,
 the update script. On a 1 GB host, configure at least 2 GB swap before the
 first dependency install and build.
 
-The Git deploy key on the VPS must have read-only access to
-`inkoromi21/VibeWorkMax`.
-
-Create a dedicated key with a passphrase. Do not pass `-N ""`: SSH will ask
-for this passphrase on every deployment.
-
-```sh
-install -d -m 0700 /root/.ssh
-ssh-keygen -t ed25519 -f /root/.ssh/id_ed25519_vibeworkmax -C "vibeworkmax-vps"
-cat /root/.ssh/id_ed25519_vibeworkmax.pub
-```
-
-Add the printed public key in the GitHub repository under **Settings → Deploy
-keys** with read-only access. The private key remains only on the VPS.
+The VPS does not need a GitHub deploy key and does not retain a GitHub token.
+The update script asks for a GitHub login and a fine-grained PAT directly in
+the VPS terminal on every run. The token is not stored and is never placed in
+the command line.
 
 ## First installation
 
@@ -83,9 +73,9 @@ its `server_name` and routing have been reconciled with that site.
 cd /opt/vibeworkmax && bash deploy/vps-native-pull-and-update.sh
 ```
 
-The command asks for the deploy-key passphrase, pulls only a fast-forward
-update from `main`, then builds and restarts the services. It does not store
-the passphrase in `ssh-agent` and refuses non-interactive execution.
+Git requests the GitHub login and PAT during the pull. The script then builds
+and restarts the services. The repository must be cloned once before this
+routine command is used.
 
 ## Verification and recovery
 
