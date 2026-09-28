@@ -1,0 +1,32 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://vibework.local/schemas/phase1.json",
+  "title": "VibeWorkPhase1Contracts",
+  "$defs": {
+    "JobState": {
+      "type": "string",
+      "enum": ["QUEUED", "RUNNING", "SUCCEEDED", "FAILED", "TIMED_OUT", "DEAD_LETTERED"]
+    },
+    "JobFailure": {
+      "type": "object",
+      "properties": {
+        "code": { "type": "string", "minLength": 1 },
+        "message": { "type": "string", "minLength": 1 }
+      },
+      "required": ["code", "message"],
+      "additionalProperties": false
+    },
+    "JobStatusResponse": {
+      "type": "object",
+      "properties": {
+        "job_id": { "type": "string", "minLength": 1 },
+        "state": { "$ref": "#/$defs/JobState" },
+        "attempts_made": { "type": "integer", "minimum": 0 },
+        "retryable": { "type": "boolean" },
+        "failure": { "anyOf": [{ "$ref": "#/$defs/JobFailure" }, { "type": "null" }] }
+      },
+      "required": ["job_id", "state", "attempts_made", "retryable", "failure"],
+      "additionalProperties": false
+    }
+  }
+}

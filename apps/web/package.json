@@ -1,0 +1,25 @@
+{
+  "name": "@vibework/web",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "vite build",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "dev": "vite",
+    "preview": "vite preview --host 0.0.0.0"
+  },
+  "dependencies": {
+    "@maxhub/max-ui": "^0.5.0",
+    "@vibework/contracts": "workspace:*",
+    "react": "^19.1.1",
+    "react-dom": "^19.1.1",
+    "react-router-dom": "^7.18.4"
+  },
+  "devDependencies": {
+    "@types/react": "^19.1.13",
+    "@types/react-dom": "^19.1.9",
+    "@vitejs/plugin-react": "^5.0.3",
+    "vite": "^7.1.7"
+  }
+}

@@ -1,0 +1,34 @@
+{
+  "name": "@vibework/contracts",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "source"
+  ],
+  "scripts": {
+    "build": "tsup src/index.ts --format esm --dts --clean",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "vitest run test",
+    "generate": "node --import tsx scripts/generate.ts",
+    "check": "node --import tsx scripts/check.ts"
+  },
+  "dependencies": {
+    "@apidevtools/swagger-parser": "^12.0.0",
+    "ajv": "^8.17.1",
+    "ajv-formats": "^3.0.1"
+  },
+  "devDependencies": {
+    "json-schema-to-typescript": "^15.0.4",
+    "tsx": "^4.20.5"
+  }
+}

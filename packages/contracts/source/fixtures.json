@@ -1,0 +1,1132 @@
+{
+  "schema_version": "4.0",
+  "data_mode": "DEMO_SYNTHETIC",
+  "expert_approved": false,
+  "notice": "Авторские технические примеры. Не стандартизированные методики, не реальная вакансия. PUBLISHED_DEMO допускается только в изолированном demo-каталоге; в live такой статус запрещён.",
+  "competencies": [
+    {
+      "competency_id": "var.update",
+      "label": "Изменять значение переменной",
+      "required_criteria": [
+        "value"
+      ],
+      "prerequisites": []
+    },
+    {
+      "competency_id": "loop.exit",
+      "label": "Определять завершение цикла",
+      "required_criteria": [
+        "termination"
+      ],
+      "prerequisites": [
+        "var.update"
+      ]
+    },
+    {
+      "competency_id": "web.page",
+      "label": "Создать простую HTML страницу",
+      "required_criteria": [
+        "structure",
+        "content"
+      ],
+      "prerequisites": []
+    },
+    {
+      "competency_id": "explore.compare",
+      "label": "Сравнить опыт двух проб и выбрать следующий шаг",
+      "required_criteria": [
+        "comparison",
+        "next_action"
+      ],
+      "prerequisites": []
+    },
+    {
+      "competency_id": "practice.map",
+      "label": "Связать свои доказательства с требованиями учебной роли",
+      "required_criteria": [
+        "mapping",
+        "next_action"
+      ],
+      "prerequisites": []
+    }
+  ],
+  "mastery_policies": [
+    {
+      "policy_version": "var.update-policy-v1",
+      "competency_id": "var.update",
+      "required_criteria": [
+        "value"
+      ],
+      "required_independent_families": 2,
+      "minimum_difficulty": 1,
+      "allowed_assistance": [
+        "NONE"
+      ],
+      "validity_days": 90,
+      "requires_integrative_task": false,
+      "compatible_rubric_versions": [
+        "var.update-rubric-v1"
+      ],
+      "foundation_criteria": [
+        "value"
+      ]
+    },
+    {
+      "policy_version": "loop.exit-policy-v1",
+      "competency_id": "loop.exit",
+      "required_criteria": [
+        "termination"
+      ],
+      "required_independent_families": 2,
+      "minimum_difficulty": 1,
+      "allowed_assistance": [
+        "NONE"
+      ],
+      "validity_days": 90,
+      "requires_integrative_task": false,
+      "compatible_rubric_versions": [
+        "loop.exit-rubric-v1"
+      ],
+      "foundation_criteria": []
+    },
+    {
+      "policy_version": "web.page-policy-v1",
+      "competency_id": "web.page",
+      "required_criteria": [
+        "structure",
+        "content"
+      ],
+      "required_independent_families": 2,
+      "minimum_difficulty": 1,
+      "allowed_assistance": [
+        "NONE"
+      ],
+      "validity_days": 90,
+      "requires_integrative_task": true,
+      "compatible_rubric_versions": [
+        "web.page-rubric-v1"
+      ],
+      "foundation_criteria": []
+    },
+    {
+      "policy_version": "explore.compare-policy-v1",
+      "competency_id": "explore.compare",
+      "required_criteria": [
+        "comparison",
+        "next_action"
+      ],
+      "required_independent_families": 2,
+      "minimum_difficulty": 1,
+      "allowed_assistance": [
+        "NONE"
+      ],
+      "validity_days": 90,
+      "requires_integrative_task": true,
+      "compatible_rubric_versions": [
+        "explore.compare-rubric-v1"
+      ],
+      "foundation_criteria": []
+    },
+    {
+      "policy_version": "practice.map-policy-v1",
+      "competency_id": "practice.map",
+      "required_criteria": [
+        "mapping",
+        "next_action"
+      ],
+      "required_independent_families": 2,
+      "minimum_difficulty": 1,
+      "allowed_assistance": [
+        "NONE"
+      ],
+      "validity_days": 90,
+      "requires_integrative_task": true,
+      "compatible_rubric_versions": [
+        "practice.map-rubric-v1"
+      ],
+      "foundation_criteria": []
+    }
+  ],
+  "rubrics": [
+    {
+      "rubric_version": "var.update-rubric-v1",
+      "competency_id": "var.update",
+      "criteria": [
+        {
+          "id": "value",
+          "pass_condition": "Оба последовательных изменения применены к текущему значению; итог верен.",
+          "required": true
+        }
+      ],
+      "task_pass_rule": "Все обязательные критерии PASS в текущем ответе. Иначе PARTIAL при хотя бы одном PASS; иначе FAIL. Неоднозначный ответ NOT_ASSESSED/NEEDS_REVIEW."
+    },
+    {
+      "rubric_version": "loop.exit-rubric-v1",
+      "competency_id": "loop.exit",
+      "criteria": [
+        {
+          "id": "termination",
+          "pass_condition": "Начальное значение, условие и изменение согласованы; число проходов или условие остановки объяснены верно.",
+          "required": true
+        }
+      ],
+      "task_pass_rule": "Все обязательные критерии PASS в текущем ответе. Иначе PARTIAL при хотя бы одном PASS; иначе FAIL. Неоднозначный ответ NOT_ASSESSED/NEEDS_REVIEW."
+    },
+    {
+      "rubric_version": "web.page-rubric-v1",
+      "competency_id": "web.page",
+      "criteria": [
+        {
+          "id": "structure",
+          "pass_condition": "Есть doctype, html, head, непустой title и body; теги вложены корректно.",
+          "required": true
+        },
+        {
+          "id": "content",
+          "pass_condition": "Есть непустой h1 и абзац; выполнены дополнительные требования конкретного варианта.",
+          "required": true
+        }
+      ],
+      "task_pass_rule": "Все обязательные критерии PASS в текущем ответе. Иначе PARTIAL при хотя бы одном PASS; иначе FAIL. Неоднозначный ответ NOT_ASSESSED/NEEDS_REVIEW."
+    },
+    {
+      "rubric_version": "explore.compare-rubric-v1",
+      "competency_id": "explore.compare",
+      "criteria": [
+        {
+          "id": "comparison",
+          "pass_condition": "Есть конкретные наблюдения выполненных действий и осмысленное сравнение, без оценки предпочтения как правильного.",
+          "required": true
+        },
+        {
+          "id": "next_action",
+          "pass_condition": "Выбран конкретный выполнимый следующий опыт с основанием в наблюдениях.",
+          "required": true
+        }
+      ],
+      "task_pass_rule": "Все обязательные критерии PASS в текущем ответе. Иначе PARTIAL при хотя бы одном PASS; иначе FAIL. Неоднозначный ответ NOT_ASSESSED/NEEDS_REVIEW."
+    },
+    {
+      "rubric_version": "practice.map-rubric-v1",
+      "competency_id": "practice.map",
+      "criteria": [
+        {
+          "id": "mapping",
+          "pass_condition": "Каждому учебному требованию сопоставлено проверяемое доказательство или явное неизвестное; реальное наличие работы проверяется отдельно.",
+          "required": true
+        },
+        {
+          "id": "next_action",
+          "pass_condition": "Следующее действие адресует конкретное недостающее доказательство.",
+          "required": true
+        }
+      ],
+      "task_pass_rule": "Все обязательные критерии PASS в текущем ответе. Иначе PARTIAL при хотя бы одном PASS; иначе FAIL. Неоднозначный ответ NOT_ASSESSED/NEEDS_REVIEW."
+    }
+  ],
+  "tasks": [
+    {
+      "task_version_id": "var.update-a-v1",
+      "task_family_id": "var.update-a",
+      "competency_ids": [
+        "var.update"
+      ],
+      "rubric_version": "var.update-rubric-v1",
+      "difficulty": 1,
+      "assessment_kind": "LOCAL",
+      "prompt": "Пусть n = 3. Выполнены n = n + 2 и затем n = n * 2. Какое значение n? Объясните порядок.",
+      "expected_good_answer": "10: сначала 5, затем 10.",
+      "example_incorrect_answer": "5 — учтено только первое действие.",
+      "allowed_alternatives": "Иные ответы, полностью удовлетворяющие критериям; примеры не являются единственным допустимым текстом.",
+      "requires_expert_for_live_use": true,
+      "estimated_seconds": 120,
+      "device_types": [
+        "PHONE",
+        "TABLET",
+        "DESKTOP"
+      ],
+      "required_tools": []
+    },
+    {
+      "task_version_id": "var.update-b-v1",
+      "task_family_id": "var.update-b",
+      "competency_ids": [
+        "var.update"
+      ],
+      "rubric_version": "var.update-rubric-v1",
+      "difficulty": 1,
+      "assessment_kind": "LOCAL",
+      "prompt": "В коробке было 8 жетонов. Отняли 3, затем добавили 4. Запишите два обновления переменной count и итог.",
+      "expected_good_answer": "count = 8; count = count - 3; count = count + 4; итог 9.",
+      "example_incorrect_answer": "count = 8 - 3 - 4; итог 1.",
+      "allowed_alternatives": "Иные ответы, полностью удовлетворяющие критериям; примеры не являются единственным допустимым текстом.",
+      "requires_expert_for_live_use": true,
+      "estimated_seconds": 120,
+      "device_types": [
+        "PHONE",
+        "TABLET",
+        "DESKTOP"
+      ],
+      "required_tools": []
+    },
+    {
+      "task_version_id": "var.update-c-v1",
+      "task_family_id": "var.update-c",
+      "competency_ids": [
+        "var.update"
+      ],
+      "rubric_version": "var.update-rubric-v1",
+      "difficulty": 1,
+      "assessment_kind": "LOCAL",
+      "prompt": "Начальное значение 4. Его удвоили, затем вычли 3. Ученик записал (4 - 3) * 2. Найдите ошибку порядка и исправьте вычисление.",
+      "expected_good_answer": "Нужно сначала 4*2=8, затем 8-3=5. В записи ученика операции поменялись местами.",
+      "example_incorrect_answer": "Правильный итог 2.",
+      "allowed_alternatives": "Иные ответы, полностью удовлетворяющие критериям; примеры не являются единственным допустимым текстом.",
+      "requires_expert_for_live_use": true,
+      "estimated_seconds": 120,
+      "device_types": [
+        "PHONE",
+        "TABLET",
+        "DESKTOP"
+      ],
+      "required_tools": []
+    },
+    {
+      "task_version_id": "loop.exit-a-v1",
+      "task_family_id": "loop.exit-a",
+      "competency_ids": [
+        "loop.exit"
+      ],
+      "rubric_version": "loop.exit-rubric-v1",
+      "difficulty": 1,
+      "assessment_kind": "LOCAL",
+      "prompt": "x = 0; while x < 3: x = x + 1. Сколько проходов, какое итоговое x и почему цикл остановится?",
+      "expected_good_answer": "3 прохода; x=3; условие 3<3 ложно.",
+      "example_incorrect_answer": "4 прохода; x=4.",
+      "allowed_alternatives": "Иные ответы, полностью удовлетворяющие критериям; примеры не являются единственным допустимым текстом.",
+      "requires_expert_for_live_use": true,
+      "estimated_seconds": 120,
+      "device_types": [
+        "PHONE",
+        "TABLET",
+        "DESKTOP"
+      ],
+      "required_tools": []
+    },
+    {
+      "task_version_id": "loop.exit-b-v1",
+      "task_family_id": "loop.exit-b",
+      "competency_ids": [
+        "loop.exit"
+      ],
+      "rubric_version": "loop.exit-rubric-v1",
+      "difficulty": 1,
+      "assessment_kind": "LOCAL",
+      "prompt": "Есть 5 билетов. Каждый проход отдаёт один билет. Задайте начальное значение, условие и обновление, чтобы остановиться, когда билетов не осталось.",
+      "expected_good_answer": "tickets=5; while tickets>0: tickets=tickets-1; после 5 проходов tickets=0.",
+      "example_incorrect_answer": "while tickets>=0 без изменения tickets.",
+      "allowed_alternatives": "Иные ответы, полностью удовлетворяющие критериям; примеры не являются единственным допустимым текстом.",
+      "requires_expert_for_live_use": true,
+      "estimated_seconds": 120,
+      "device_types": [
+        "PHONE",
+        "TABLET",
+        "DESKTOP"
+      ],
+      "required_tools": []
+    },
+    {
+      "task_version_id": "loop.exit-c-v1",
+      "task_family_id": "loop.exit-c",
+      "competency_ids": [
+        "loop.exit"
+      ],
+      "rubric_version": "loop.exit-rubric-v1",
+      "difficulty": 1,
+      "assessment_kind": "LOCAL",
+      "prompt": "remaining = 4; while remaining > 0: print(remaining). Объясните, почему цикл не заканчивается, и предложите исправление с конечным числом проходов.",
+      "expected_good_answer": "remaining не меняется. Добавить remaining = remaining - 1 в тело; будет 4 прохода, затем remaining=0.",
+      "example_incorrect_answer": "Заменить условие на remaining >= 0 без изменения тела.",
+      "allowed_alternatives": "Иные ответы, полностью удовлетворяющие критериям; примеры не являются единственным допустимым текстом.",
+      "requires_expert_for_live_use": true,
+      "estimated_seconds": 120,
+      "device_types": [
+        "PHONE",
+        "TABLET",
+        "DESKTOP"
+      ],
+      "required_tools": []
+    },
+    {
+      "task_version_id": "web.page-a-v1",
+      "task_family_id": "web.page-a",
+      "competency_ids": [
+        "web.page"
+      ],
+      "rubric_version": "web.page-rubric-v1",
+      "difficulty": 1,
+      "assessment_kind": "INTEGRATIVE",
+      "prompt": "Напишите HTML страницы о любимом занятии с title, h1 и абзацем.",
+      "expected_good_answer": "<!doctype html><html><head><title>Шахматы</title></head><body><h1>Шахматы</h1><p>Я учусь играть.</p></body></html>",
+      "example_incorrect_answer": "<h1>Шахматы</h1> без документа и абзаца.",
+      "allowed_alternatives": "Иные ответы, полностью удовлетворяющие критериям; примеры не являются единственным допустимым текстом.",
+      "requires_expert_for_live_use": true,
+      "estimated_seconds": 120,
+      "device_types": [
+        "PHONE",
+        "TABLET",
+        "DESKTOP"
+      ],
+      "required_tools": []
+    },
+    {
+      "task_version_id": "web.page-b-v1",
+      "task_family_id": "web.page-b",
+      "competency_ids": [
+        "web.page"
+      ],
+      "rubric_version": "web.page-rubric-v1",
+      "difficulty": 1,
+      "assessment_kind": "INTEGRATIVE",
+      "prompt": "Исправьте документ <html><head></head><body><p>Моя страница</p></body></html>: добавьте doctype, title, h1 и ссылку https://example.com.",
+      "expected_good_answer": "<!doctype html><html><head><title>Портфолио</title></head><body><h1>Портфолио</h1><p>Моя страница</p><a href=\"https://example.com\">Пример</a></body></html>",
+      "example_incorrect_answer": "Портфолио написано простым текстом без разметки.",
+      "allowed_alternatives": "Иные ответы, полностью удовлетворяющие критериям; примеры не являются единственным допустимым текстом.",
+      "requires_expert_for_live_use": true,
+      "estimated_seconds": 120,
+      "device_types": [
+        "PHONE",
+        "TABLET",
+        "DESKTOP"
+      ],
+      "required_tools": []
+    },
+    {
+      "task_version_id": "web.page-c-v1",
+      "task_family_id": "web.page-c",
+      "competency_ids": [
+        "web.page"
+      ],
+      "rubric_version": "web.page-rubric-v1",
+      "difficulty": 1,
+      "assessment_kind": "INTEGRATIVE",
+      "prompt": "Проверьте чужую страницу: <!doctype html><html><head><title></title></head><body><h1>О проекте</h1><p></p></body></html>. Достаточна ли структура и содержание? Предложите полный исправленный вариант.",
+      "expected_good_answer": "Структура есть, но title и абзац пусты. <!doctype html><html><head><title>Проект</title></head><body><h1>О проекте</h1><p>Это учебная работа.</p></body></html>",
+      "example_incorrect_answer": "Всё готово; пустые title и p достаточны.",
+      "allowed_alternatives": "Иные ответы, полностью удовлетворяющие критериям; примеры не являются единственным допустимым текстом.",
+      "requires_expert_for_live_use": true,
+      "estimated_seconds": 120,
+      "device_types": [
+        "PHONE",
+        "TABLET",
+        "DESKTOP"
+      ],
+      "required_tools": []
+    },
+    {
+      "task_version_id": "explore.compare-a-v1",
+      "task_family_id": "explore.compare-a",
+      "competency_ids": [
+        "explore.compare"
+      ],
+      "rubric_version": "explore.compare-rubric-v1",
+      "difficulty": 1,
+      "assessment_kind": "INTEGRATIVE",
+      "prompt": "Выполните обе короткие пробы из материала. Приведите по одному наблюдению о каждой и выберите следующий опыт с причиной.",
+      "expected_good_answer": "В объяснении понравилось подбирать пример, трудно сократить текст. В макете понравилась структура, трудно выбрать порядок. Попробую объяснить незнакомую задачу другу, чтобы проверить, понятны ли мои примеры.",
+      "example_incorrect_answer": "Я точно стану дизайнером, потому что тест так решил; пробы не описаны.",
+      "allowed_alternatives": "Иные ответы, полностью удовлетворяющие критериям; примеры не являются единственным допустимым текстом.",
+      "requires_expert_for_live_use": true,
+      "estimated_seconds": 120,
+      "device_types": [
+        "PHONE",
+        "TABLET",
+        "DESKTOP"
+      ],
+      "required_tools": []
+    },
+    {
+      "task_version_id": "explore.compare-b-v1",
+      "task_family_id": "explore.compare-b",
+      "competency_ids": [
+        "explore.compare"
+      ],
+      "rubric_version": "explore.compare-rubric-v1",
+      "difficulty": 1,
+      "assessment_kind": "INTEGRATIVE",
+      "prompt": "Через новую пробу: объясните другому человеку один учебный термин и получите обратную связь. Сравните этот опыт с первым и назовите следующий проверяемый шаг.",
+      "expected_good_answer": "В первый раз объяснение было длинным; теперь человек повторил смысл своими словами, но не понял пример. Следующий шаг — дать другой пример и проверить понимание.",
+      "example_incorrect_answer": "Мне нравится всё. Следующий шаг не указан.",
+      "allowed_alternatives": "Иные ответы, полностью удовлетворяющие критериям; примеры не являются единственным допустимым текстом.",
+      "requires_expert_for_live_use": true,
+      "estimated_seconds": 120,
+      "device_types": [
+        "PHONE",
+        "TABLET",
+        "DESKTOP"
+      ],
+      "required_tools": []
+    },
+    {
+      "task_version_id": "explore.compare-c-v1",
+      "task_family_id": "explore.compare-c",
+      "competency_ids": [
+        "explore.compare"
+      ],
+      "rubric_version": "explore.compare-rubric-v1",
+      "difficulty": 1,
+      "assessment_kind": "INTEGRATIVE",
+      "prompt": "Спланируйте и выполните новую короткую пробу, отличную от двух первых. Назовите наблюдение, сопоставьте его с прежним опытом и уточните следующий шаг.",
+      "expected_good_answer": "Составил план небольшого мероприятия: понравилось распределять задачи, трудно оценить время. В объяснении было легче оценить понятность. Попробую провести маленькую встречу и проверить длительность плана.",
+      "example_incorrect_answer": "Выбираю профессию по названию, новую пробу не выполнял.",
+      "allowed_alternatives": "Иные ответы, полностью удовлетворяющие критериям; примеры не являются единственным допустимым текстом.",
+      "requires_expert_for_live_use": true,
+      "estimated_seconds": 120,
+      "device_types": [
+        "PHONE",
+        "TABLET",
+        "DESKTOP"
+      ],
+      "required_tools": []
+    },
+    {
+      "task_version_id": "practice.map-a-v1",
+      "task_family_id": "practice.map-a",
+      "competency_ids": [
+        "practice.map"
+      ],
+      "rubric_version": "practice.map-rubric-v1",
+      "difficulty": 1,
+      "assessment_kind": "INTEGRATIVE",
+      "prompt": "Для DEMO-ROLE-01 сопоставьте требования со своими работами или укажите отсутствие доказательства; предложите следующий шаг.",
+      "expected_good_answer": "HTML: есть ссылка на собственный учебный файл. Объяснение решений: ещё не проверено. Запишу пояснение структуры страницы и попрошу преподавателя задать вопросы.",
+      "example_incorrect_answer": "Я подхожу на любую стажировку; подтверждений нет.",
+      "allowed_alternatives": "Иные ответы, полностью удовлетворяющие критериям; примеры не являются единственным допустимым текстом.",
+      "requires_expert_for_live_use": true,
+      "estimated_seconds": 120,
+      "device_types": [
+        "PHONE",
+        "TABLET",
+        "DESKTOP"
+      ],
+      "required_tools": []
+    },
+    {
+      "task_version_id": "practice.map-b-v1",
+      "task_family_id": "practice.map-b",
+      "competency_ids": [
+        "practice.map"
+      ],
+      "rubric_version": "practice.map-rubric-v1",
+      "difficulty": 1,
+      "assessment_kind": "INTEGRATIVE",
+      "prompt": "После учебной проверки объяснения обновите карту требований: что подтверждено, что ещё неизвестно и какой следующий шаг нужен?",
+      "expected_good_answer": "Страница проверена по рубрике; пояснение структуры понятно, объяснение выбора ссылки пока не проверено. Следующий шаг — отдельно объяснить ссылку и получить проверку.",
+      "example_incorrect_answer": "Просто отправлю заявки всем работодателям.",
+      "allowed_alternatives": "Иные ответы, полностью удовлетворяющие критериям; примеры не являются единственным допустимым текстом.",
+      "requires_expert_for_live_use": true,
+      "estimated_seconds": 120,
+      "device_types": [
+        "PHONE",
+        "TABLET",
+        "DESKTOP"
+      ],
+      "required_tools": []
+    },
+    {
+      "task_version_id": "practice.map-c-v1",
+      "task_family_id": "practice.map-c",
+      "competency_ids": [
+        "practice.map"
+      ],
+      "rubric_version": "practice.map-rubric-v1",
+      "difficulty": 1,
+      "assessment_kind": "INTEGRATIVE",
+      "prompt": "Проведите самопроверку учебного портфолио для DEMO-ROLE-01: приведите доступные подтверждения двух требований, отметьте ненадёжное подтверждение и назначьте способ проверки.",
+      "expected_good_answer": "Есть HTML файл, но он ещё не проверен по рубрике; есть записанное объяснение структуры. Отдам файл на проверку structure/content и попрошу проверяющего уточнить один выбор.",
+      "example_incorrect_answer": "Файл существует, значит любое требование выполнено.",
+      "allowed_alternatives": "Иные ответы, полностью удовлетворяющие критериям; примеры не являются единственным допустимым текстом.",
+      "requires_expert_for_live_use": true,
+      "estimated_seconds": 120,
+      "device_types": [
+        "PHONE",
+        "TABLET",
+        "DESKTOP"
+      ],
+      "required_tools": []
+    }
+  ],
+  "learning_blocks": [
+    {
+      "block_id": "var.update-block",
+      "competency_id": "var.update",
+      "material_version_id": "var.update-material-v1",
+      "prerequisite_ids": [],
+      "difficulty": 1,
+      "estimated_minutes": 8,
+      "device_types": [
+        "PHONE",
+        "TABLET",
+        "DESKTOP"
+      ],
+      "required_tools": [],
+      "language": "ru",
+      "format": "TEXT",
+      "cost_class": "FREE",
+      "age_groups": [
+        "15-17",
+        "18+"
+      ],
+      "publication_status": "PUBLISHED_DEMO",
+      "source_fragment_ids": [
+        "DEMO-ORIGINAL-var.update"
+      ],
+      "expert_approval": false,
+      "lesson_text": "Переменная хранит текущее значение. В присваивании n = n + 2 сначала вычисляется правая часть по старому n, затем новое значение записывается слева. Если n было 3, после присваивания оно равно 5.",
+      "practice_task_id": "var.update-a-v1",
+      "independent_task_id": "var.update-b-v1",
+      "retry_task_id": "var.update-c-v1"
+    },
+    {
+      "block_id": "loop.exit-block",
+      "competency_id": "loop.exit",
+      "material_version_id": "loop.exit-material-v1",
+      "prerequisite_ids": [
+        "var.update"
+      ],
+      "difficulty": 1,
+      "estimated_minutes": 8,
+      "device_types": [
+        "PHONE",
+        "TABLET",
+        "DESKTOP"
+      ],
+      "required_tools": [],
+      "language": "ru",
+      "format": "TEXT",
+      "cost_class": "FREE",
+      "age_groups": [
+        "15-17",
+        "18+"
+      ],
+      "publication_status": "PUBLISHED_DEMO",
+      "source_fragment_ids": [
+        "DEMO-ORIGINAL-loop.exit"
+      ],
+      "expert_approval": false,
+      "lesson_text": "В цикле while условие проверяется до очередного прохода. Тело должно менять данные так, чтобы условие когда-нибудь стало ложным. Для проверки выпишите значение переменной до прохода, после обновления и результат следующей проверки условия. Число проходов и последнее значение могут отличаться.",
+      "practice_task_id": "loop.exit-a-v1",
+      "independent_task_id": "loop.exit-b-v1",
+      "retry_task_id": "loop.exit-c-v1"
+    },
+    {
+      "block_id": "web.page-block",
+      "competency_id": "web.page",
+      "material_version_id": "web.page-material-v1",
+      "prerequisite_ids": [],
+      "difficulty": 1,
+      "estimated_minutes": 8,
+      "device_types": [
+        "PHONE",
+        "TABLET",
+        "DESKTOP"
+      ],
+      "required_tools": [],
+      "language": "ru",
+      "format": "TEXT",
+      "cost_class": "FREE",
+      "age_groups": [
+        "15-17",
+        "18+"
+      ],
+      "publication_status": "PUBLISHED_DEMO",
+      "source_fragment_ids": [
+        "DEMO-ORIGINAL-web.page"
+      ],
+      "expert_approval": false,
+      "lesson_text": "Простой HTML документ содержит doctype, html, head с title и body. В body заголовок h1 задаёт название раздела, p — абзац, а a с href — ссылку. Здесь проверяется текст разметки; код не запускается на сервере.",
+      "practice_task_id": "web.page-a-v1",
+      "independent_task_id": "web.page-b-v1",
+      "retry_task_id": "web.page-c-v1"
+    },
+    {
+      "block_id": "explore.compare-block",
+      "competency_id": "explore.compare",
+      "material_version_id": "explore.compare-material-v1",
+      "prerequisite_ids": [],
+      "difficulty": 1,
+      "estimated_minutes": 8,
+      "device_types": [
+        "PHONE",
+        "TABLET",
+        "DESKTOP"
+      ],
+      "required_tools": [],
+      "language": "ru",
+      "format": "TEXT",
+      "cost_class": "FREE",
+      "age_groups": [
+        "15-17",
+        "18+"
+      ],
+      "publication_status": "PUBLISHED_DEMO",
+      "source_fragment_ids": [
+        "DEMO-ORIGINAL-explore.compare"
+      ],
+      "expert_approval": false,
+      "lesson_text": "Профессиональная проба даёт опыт конкретного действия. Попробуйте (1) объяснить новичку знакомое правило в трёх шагах и (2) составить маленькую инструкцию или макет. Сравните, что заинтересовало, что было трудно и что хотелось бы попробовать дальше. Здесь нет правильного интереса и вывода о пригодности.",
+      "practice_task_id": "explore.compare-a-v1",
+      "independent_task_id": "explore.compare-b-v1",
+      "retry_task_id": "explore.compare-c-v1"
+    },
+    {
+      "block_id": "practice.map-block",
+      "competency_id": "practice.map",
+      "material_version_id": "practice.map-material-v1",
+      "prerequisite_ids": [],
+      "difficulty": 1,
+      "estimated_minutes": 8,
+      "device_types": [
+        "PHONE",
+        "TABLET",
+        "DESKTOP"
+      ],
+      "required_tools": [],
+      "language": "ru",
+      "format": "TEXT",
+      "cost_class": "FREE",
+      "age_groups": [
+        "15-17",
+        "18+"
+      ],
+      "publication_status": "PUBLISHED_DEMO",
+      "source_fragment_ids": [
+        "DEMO-ORIGINAL-practice.map"
+      ],
+      "expert_approval": false,
+      "lesson_text": "Учебная роль DEMO-ROLE-01 вымышлена: ожидаются простая HTML страница и объяснение принятых решений. Для каждого требования запишите собственное доказательство или честно обозначьте неизвестное. Затем выберите действие, которое позволит получить недостающее доказательство. Это не вакансия и не реальное требование работодателя.",
+      "practice_task_id": "practice.map-a-v1",
+      "independent_task_id": "practice.map-b-v1",
+      "retry_task_id": "practice.map-c-v1"
+    }
+  ],
+  "evidence": [
+    {
+      "evidence_id": "ev-var-a",
+      "user_id": "Loop-B",
+      "competency_id": "var.update",
+      "criterion_id": "value",
+      "observed_result": "PASS",
+      "evidence_kind": "PRACTICE",
+      "task_family_id": "var.update-a",
+      "task_version_id": "var.update-a-v1",
+      "rubric_version": "var.update-rubric-v1",
+      "difficulty": 1,
+      "assistance_level": "NONE",
+      "assessment_kind": "LOCAL",
+      "source_ref": "attempt-var-a",
+      "status": "ACTIVE",
+      "created_at": "2026-09-23T12:00:00Z",
+      "evidence_excerpt": "10: сначала 5, затем 10."
+    },
+    {
+      "evidence_id": "ev-var-b",
+      "user_id": "Loop-B",
+      "competency_id": "var.update",
+      "criterion_id": "value",
+      "observed_result": "PASS",
+      "evidence_kind": "PRACTICE",
+      "task_family_id": "var.update-b",
+      "task_version_id": "var.update-b-v1",
+      "rubric_version": "var.update-rubric-v1",
+      "difficulty": 1,
+      "assistance_level": "NONE",
+      "assessment_kind": "LOCAL",
+      "source_ref": "attempt-var-b",
+      "status": "ACTIVE",
+      "created_at": "2026-09-23T12:00:00Z",
+      "evidence_excerpt": "count = 8; count = count - 3; count = count + 4; итог 9."
+    }
+  ],
+  "contexts": [
+    {
+      "schema_version": "4.0",
+      "session_id": "diag-Loop-A",
+      "problem_id": "problem-Loop-A",
+      "problem_version": 1,
+      "profile_version": 1,
+      "evidence_revision": 0,
+      "goal_type": "KNOWLEDGE_GAP",
+      "confirmed_goal": "Объяснить и корректно остановить простой цикл.",
+      "completeness": "COMPLETED_PARTIAL",
+      "competencies": [
+        {
+          "competency_id": "var.update",
+          "mastery_state": "unknown",
+          "evidence_sufficiency": "insufficient",
+          "policy_version": "var.update-policy-v1",
+          "evidence_ids": [],
+          "passed_criteria": [],
+          "failed_criteria": [],
+          "unobserved_criteria": [
+            "value"
+          ],
+          "open_conflict": false,
+          "evaluated_at": "2026-09-23T12:00:00Z"
+        },
+        {
+          "competency_id": "loop.exit",
+          "mastery_state": "unknown",
+          "evidence_sufficiency": "insufficient",
+          "policy_version": "loop.exit-policy-v1",
+          "evidence_ids": [],
+          "passed_criteria": [],
+          "failed_criteria": [],
+          "unobserved_criteria": [
+            "termination"
+          ],
+          "open_conflict": false,
+          "evaluated_at": "2026-09-23T12:00:00Z"
+        }
+      ],
+      "interests": [],
+      "constraints": {
+        "age_group": "15-17",
+        "role": "SCHOOL",
+        "device": "PHONE",
+        "tools": [],
+        "session_minutes": 20,
+        "weekly_minutes": 100,
+        "deadline": null,
+        "language": "ru",
+        "paid_resources_allowed": false,
+        "preferred_format": "TEXT"
+      },
+      "evidence_ids": [],
+      "unresolved_questions": [
+        "Проверить целевую компетенцию первой пробой."
+      ],
+      "recommended_entry": {
+        "competency_id": "var.update",
+        "reason": {
+          "kind": "PREREQUISITE_CHECK",
+          "explanation": "Выбор по подтверждённым предпосылкам и неизвестной целевой компетенции.",
+          "evidence_ids": [],
+          "assumption_reason": "Целевой навык ещё не проверен."
+        }
+      },
+      "method_versions": [
+        "DEMO-ORIGINAL-4.0"
+      ]
+    },
+    {
+      "schema_version": "4.0",
+      "session_id": "diag-Loop-B",
+      "problem_id": "problem-Loop-B",
+      "problem_version": 1,
+      "profile_version": 1,
+      "evidence_revision": 2,
+      "goal_type": "KNOWLEDGE_GAP",
+      "confirmed_goal": "Объяснить и корректно остановить простой цикл.",
+      "completeness": "COMPLETED",
+      "competencies": [
+        {
+          "competency_id": "var.update",
+          "mastery_state": "demonstrated",
+          "evidence_sufficiency": "sufficient",
+          "policy_version": "var.update-policy-v1",
+          "evidence_ids": [
+            "ev-var-a",
+            "ev-var-b"
+          ],
+          "passed_criteria": [
+            "value"
+          ],
+          "failed_criteria": [],
+          "unobserved_criteria": [],
+          "open_conflict": false,
+          "evaluated_at": "2026-09-23T12:00:00Z"
+        },
+        {
+          "competency_id": "loop.exit",
+          "mastery_state": "unknown",
+          "evidence_sufficiency": "insufficient",
+          "policy_version": "loop.exit-policy-v1",
+          "evidence_ids": [],
+          "passed_criteria": [],
+          "failed_criteria": [],
+          "unobserved_criteria": [
+            "termination"
+          ],
+          "open_conflict": false,
+          "evaluated_at": "2026-09-23T12:00:00Z"
+        }
+      ],
+      "interests": [],
+      "constraints": {
+        "age_group": "15-17",
+        "role": "SCHOOL",
+        "device": "PHONE",
+        "tools": [],
+        "session_minutes": 20,
+        "weekly_minutes": 100,
+        "deadline": null,
+        "language": "ru",
+        "paid_resources_allowed": false,
+        "preferred_format": "TEXT"
+      },
+      "evidence_ids": [
+        "ev-var-a",
+        "ev-var-b"
+      ],
+      "unresolved_questions": [
+        "Проверить целевую компетенцию первой пробой."
+      ],
+      "recommended_entry": {
+        "competency_id": "loop.exit",
+        "reason": {
+          "kind": "PREREQUISITE_CHECK",
+          "explanation": "Выбор по подтверждённым предпосылкам и неизвестной целевой компетенции.",
+          "evidence_ids": [
+            "ev-var-a",
+            "ev-var-b"
+          ],
+          "assumption_reason": "Целевой навык ещё не проверен."
+        }
+      },
+      "method_versions": [
+        "DEMO-ORIGINAL-4.0"
+      ]
+    },
+    {
+      "schema_version": "4.0",
+      "session_id": "diag-Explore-A",
+      "problem_id": "problem-Explore-A",
+      "problem_version": 1,
+      "profile_version": 1,
+      "evidence_revision": 0,
+      "goal_type": "DIRECTION",
+      "confirmed_goal": "Выполнить две пробы и выбрать следующий опыт.",
+      "completeness": "COMPLETED_PARTIAL",
+      "competencies": [
+        {
+          "competency_id": "explore.compare",
+          "mastery_state": "unknown",
+          "evidence_sufficiency": "insufficient",
+          "policy_version": "explore.compare-policy-v1",
+          "evidence_ids": [],
+          "passed_criteria": [],
+          "failed_criteria": [],
+          "unobserved_criteria": [
+            "comparison",
+            "next_action"
+          ],
+          "open_conflict": false,
+          "evaluated_at": "2026-09-23T12:00:00Z"
+        }
+      ],
+      "interests": [],
+      "constraints": {
+        "age_group": "15-17",
+        "role": "SCHOOL",
+        "device": "PHONE",
+        "tools": [],
+        "session_minutes": 20,
+        "weekly_minutes": 100,
+        "deadline": null,
+        "language": "ru",
+        "paid_resources_allowed": false,
+        "preferred_format": "TEXT"
+      },
+      "evidence_ids": [],
+      "unresolved_questions": [
+        "Проверить целевую компетенцию первой пробой."
+      ],
+      "recommended_entry": {
+        "competency_id": "explore.compare",
+        "reason": {
+          "kind": "EXPLORATION",
+          "explanation": "Выбор по подтверждённым предпосылкам и неизвестной целевой компетенции.",
+          "evidence_ids": [],
+          "assumption_reason": "Целевой навык ещё не проверен."
+        }
+      },
+      "method_versions": [
+        "DEMO-ORIGINAL-4.0"
+      ]
+    },
+    {
+      "schema_version": "4.0",
+      "session_id": "diag-Web-A",
+      "problem_id": "problem-Web-A",
+      "problem_version": 1,
+      "profile_version": 1,
+      "evidence_revision": 0,
+      "goal_type": "SKILL",
+      "confirmed_goal": "Создать простую HTML страницу.",
+      "completeness": "COMPLETED_PARTIAL",
+      "competencies": [
+        {
+          "competency_id": "web.page",
+          "mastery_state": "unknown",
+          "evidence_sufficiency": "insufficient",
+          "policy_version": "web.page-policy-v1",
+          "evidence_ids": [],
+          "passed_criteria": [],
+          "failed_criteria": [],
+          "unobserved_criteria": [
+            "structure",
+            "content"
+          ],
+          "open_conflict": false,
+          "evaluated_at": "2026-09-23T12:00:00Z"
+        }
+      ],
+      "interests": [],
+      "constraints": {
+        "age_group": "15-17",
+        "role": "SCHOOL",
+        "device": "PHONE",
+        "tools": [],
+        "session_minutes": 20,
+        "weekly_minutes": 100,
+        "deadline": null,
+        "language": "ru",
+        "paid_resources_allowed": false,
+        "preferred_format": "TEXT"
+      },
+      "evidence_ids": [],
+      "unresolved_questions": [
+        "Проверить целевую компетенцию первой пробой."
+      ],
+      "recommended_entry": {
+        "competency_id": "web.page",
+        "reason": {
+          "kind": "PREREQUISITE_CHECK",
+          "explanation": "Выбор по подтверждённым предпосылкам и неизвестной целевой компетенции.",
+          "evidence_ids": [],
+          "assumption_reason": "Целевой навык ещё не проверен."
+        }
+      },
+      "method_versions": [
+        "DEMO-ORIGINAL-4.0"
+      ]
+    },
+    {
+      "schema_version": "4.0",
+      "session_id": "diag-Practice-A",
+      "problem_id": "problem-Practice-A",
+      "problem_version": 1,
+      "profile_version": 1,
+      "evidence_revision": 0,
+      "goal_type": "PRACTICE_READINESS",
+      "confirmed_goal": "Составить подтверждаемую карту требований учебной роли.",
+      "completeness": "COMPLETED_PARTIAL",
+      "competencies": [
+        {
+          "competency_id": "practice.map",
+          "mastery_state": "unknown",
+          "evidence_sufficiency": "insufficient",
+          "policy_version": "practice.map-policy-v1",
+          "evidence_ids": [],
+          "passed_criteria": [],
+          "failed_criteria": [],
+          "unobserved_criteria": [
+            "mapping",
+            "next_action"
+          ],
+          "open_conflict": false,
+          "evaluated_at": "2026-09-23T12:00:00Z"
+        }
+      ],
+      "interests": [],
+      "constraints": {
+        "age_group": "15-17",
+        "role": "SCHOOL",
+        "device": "PHONE",
+        "tools": [],
+        "session_minutes": 20,
+        "weekly_minutes": 100,
+        "deadline": null,
+        "language": "ru",
+        "paid_resources_allowed": false,
+        "preferred_format": "TEXT"
+      },
+      "evidence_ids": [],
+      "unresolved_questions": [
+        "Проверить целевую компетенцию первой пробой."
+      ],
+      "recommended_entry": {
+        "competency_id": "practice.map",
+        "reason": {
+          "kind": "PREREQUISITE_CHECK",
+          "explanation": "Выбор по подтверждённым предпосылкам и неизвестной целевой компетенции.",
+          "evidence_ids": [],
+          "assumption_reason": "Целевой навык ещё не проверен."
+        }
+      },
+      "method_versions": [
+        "DEMO-ORIGINAL-4.0"
+      ]
+    }
+  ],
+  "expected_cases": [
+    {
+      "id": "F-01",
+      "input": "Loop-A",
+      "expected_first_competency": "var.update",
+      "expected_reason": "PREREQUISITE_CHECK"
+    },
+    {
+      "id": "F-02",
+      "input": "Loop-B",
+      "expected_first_competency": "loop.exit",
+      "skip_competency": "var.update"
+    },
+    {
+      "id": "F-03",
+      "input": "Explore-A",
+      "expected_reason": "EXPLORATION",
+      "requires_knowledge_gap": false
+    },
+    {
+      "id": "F-04",
+      "input": "Web-A",
+      "expected_first_competency": "web.page",
+      "requires_integrative": true
+    },
+    {
+      "id": "F-05",
+      "input": "Practice-A",
+      "expected_first_competency": "practice.map",
+      "real_vacancy": false
+    },
+    {
+      "id": "F-06",
+      "trigger": "Only task family a PASS, including repeat with new numbers",
+      "expected_mastery": "developing"
+    },
+    {
+      "id": "F-07",
+      "trigger": "Independent a and b PASS all criteria without assistance",
+      "expected_mastery": "demonstrated"
+    },
+    {
+      "id": "F-08",
+      "trigger": "One family PASS after SOLUTION",
+      "independent_pass_count": 0
+    },
+    {
+      "id": "F-09",
+      "trigger": "Problem version changes from 1 to 2 before publish",
+      "expected_job_state": "SUPERSEDED",
+      "active_pair_changed": false
+    },
+    {
+      "id": "F-10",
+      "trigger": "Independent criteria passed separately but no required INTEGRATIVE",
+      "expected_mastery": "developing",
+      "certificate_allowed": false
+    }
+  ]
+}

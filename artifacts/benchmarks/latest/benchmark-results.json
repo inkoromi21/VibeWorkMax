@@ -1,0 +1,61 @@
+{
+  "formatVersion": "v1",
+  "status": "BLOCKED_EXTERNAL_INPUT",
+  "dataset": {
+    "id": "model-policy-eval-v1",
+    "version": "v1",
+    "promptTemplateVersion": "v1"
+  },
+  "runCount": 2,
+  "provider": "yandex-ai-studio",
+  "models": [
+    {
+      "id": "alice-ai-llm-flash",
+      "displayName": "Alice AI LLM Flash",
+      "modelUri": null,
+      "availability": "UNAVAILABLE",
+      "unavailableReason": "Missing YANDEX_MODEL_ALICE_FLASH_URI; account/catalog access is unconfirmed."
+    },
+    {
+      "id": "alice-ai-llm",
+      "displayName": "Alice AI LLM",
+      "modelUri": null,
+      "availability": "UNAVAILABLE",
+      "unavailableReason": "Missing YANDEX_MODEL_ALICE_URI; account/catalog access is unconfirmed."
+    },
+    {
+      "id": "yandexgpt-pro-5.1",
+      "displayName": "YandexGPT Pro 5.1",
+      "modelUri": null,
+      "availability": "UNAVAILABLE",
+      "unavailableReason": "Missing YANDEX_MODEL_YANDEXGPT_PRO_5_1_URI; account/catalog access is unconfirmed."
+    }
+  ],
+  "thresholds": {
+    "schemaValidityRate": 1,
+    "domainValidityRate": 1,
+    "sourceFidelityRate": 1,
+    "maxMedianLatencyMs": 15000
+  },
+  "invocations": [],
+  "aggregates": [],
+  "modelPolicy": {
+    "status": "NOT_SELECTED",
+    "byOperationKind": {}
+  },
+  "actualAiSpend": {
+    "amount": null,
+    "currency": null
+  },
+  "blockedReasons": [
+    "YANDEX_AI_MODE must be enabled.",
+    "Missing YANDEX_FOLDER_ID.",
+    "Missing YANDEX_API_KEY.",
+    "Missing DATABASE_URL required by the Prompt 37 budget ledger.",
+    "At least one required benchmark model URI is absent; unavailable models are not substituted.",
+    "All model URIs need account/catalog confirmation in BENCHMARK_CONFIRMED_MODEL_URIS.",
+    "Missing positive BENCHMARK_TEST_BUDGET.",
+    "Missing AI_PRICING_CONFIG_JSON.",
+    "Prompt 37 budget guard must be enabled with operation and daily limits."
+  ]
+}

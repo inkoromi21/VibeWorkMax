@@ -1,0 +1,13 @@
+node_modules
+dist
+legacy
+packages/contracts/source
+packages/contracts/src/generated
+*.docx
+pnpm-lock.yaml
+docs/MISSING_INPUTS.md
+docs/REQUIREMENTS_MAP.md
+docs/SOURCE_INVENTORY.md
+docs/VIBEWORK_REUSE.md
+scripts/check-phase0.mjs
+tests/phase0

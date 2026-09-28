@@ -1,0 +1,149 @@
+name: vibework-max
+
+services:
+  postgres:
+    image: postgres:17.6-alpine
+    profiles: [lightweight, production]
+    environment:
+      POSTGRES_DB: vibework
+      POSTGRES_USER: vibework
+      POSTGRES_PASSWORD: vibework_local
+    volumes: ['postgres_data:/var/lib/postgresql/data']
+    healthcheck:
+      test: [CMD-SHELL, pg_isready -U vibework -d vibework]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  redis:
+    image: redis:7.4.5-alpine
+    profiles: [lightweight, production]
+    command: [redis-server, --appendonly, 'yes']
+    volumes: ['redis_data:/data']
+    healthcheck:
+      test: [CMD, redis-cli, ping]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  minio:
+    image: minio/minio:RELEASE.2025-04-22T22-12-26Z
+    profiles: [lightweight, production]
+    command: [server, /data, --console-address, ':9001']
+    environment:
+      MINIO_ROOT_USER: local-development-only
+      MINIO_ROOT_PASSWORD: local-development-only
+    volumes: ['minio_data:/data']
+    healthcheck:
+      test: [CMD, curl, -f, 'http://localhost:9000/minio/health/live']
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  clamav:
+    image: clamav/clamav:1.4.3
+    profiles: [production]
+    volumes: ['clamav_data:/var/lib/clamav']
+    healthcheck:
+      test: [CMD-SHELL, clamdscan --ping 1]
+      interval: 15s
+      timeout: 10s
+      retries: 30
+      start_period: 60s
+
+  migrate:
+    build: { context: ., target: migrator }
+    profiles: [lightweight, production]
+    environment:
+      DATABASE_URL: postgresql://vibework:vibework_local@postgres:5432/vibework
+    depends_on:
+      postgres: { condition: service_healthy }
+    restart: 'no'
+
+  api:
+    build: { context: ., target: api }
+    profiles: [lightweight, production]
+    environment:
+      NODE_ENV: production
+      API_PORT: 3000
+      LOG_LEVEL: info
+      DATABASE_URL: postgresql://vibework:vibework_local@postgres:5432/vibework
+      REDIS_URL: redis://redis:6379
+      S3_MODE: local
+      S3_ENDPOINT: http://minio:9000
+      CLAMAV_MODE: ${CLAMAV_MODE:-disabled}
+      MAX_MODE: disabled
+      YANDEX_AI_MODE: disabled
+      ANALYTICS_MODE: disabled
+    depends_on:
+      redis: { condition: service_healthy }
+      minio: { condition: service_healthy }
+      migrate: { condition: service_completed_successfully }
+    healthcheck:
+      test:
+        [
+          CMD,
+          node,
+          -e,
+          "fetch('http://127.0.0.1:3000/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))",
+        ]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  worker:
+    build: { context: ., target: worker }
+    profiles: [lightweight, production]
+    environment:
+      NODE_ENV: production
+      WORKER_HEALTH_PORT: 3001
+      LOG_LEVEL: info
+      DATABASE_URL: postgresql://vibework:vibework_local@postgres:5432/vibework
+      REDIS_URL: redis://redis:6379
+      NOTIFICATION_MODE: disabled
+      MAX_MODE: disabled
+      ANALYTICS_MODE: disabled
+    depends_on:
+      redis: { condition: service_healthy }
+      migrate: { condition: service_completed_successfully }
+    healthcheck:
+      test:
+        [
+          CMD,
+          node,
+          -e,
+          "fetch('http://127.0.0.1:3001/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))",
+        ]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  web:
+    build: { context: ., target: web }
+    profiles: [lightweight, production]
+    depends_on:
+      api: { condition: service_healthy }
+    healthcheck:
+      test: [CMD, wget, -q, -O, /dev/null, 'http://127.0.0.1:8080/health']
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  proxy:
+    build: { context: ., target: proxy }
+    profiles: [lightweight, production]
+    ports: ['8080:8080']
+    depends_on:
+      web: { condition: service_healthy }
+      api: { condition: service_healthy }
+    healthcheck:
+      test: [CMD, wget, -q, -O, /dev/null, 'http://127.0.0.1:8080/health']
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+volumes:
+  postgres_data:
+  redis_data:
+  minio_data:
+  clamav_data:

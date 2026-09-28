@@ -1,0 +1,1533 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Обязательные контракты ядра MAX",
+    "version": "4.0",
+    "description": "Проектный контракт ядра диагностики и курсов. Серверная реализация отсутствует в этом комплекте. Полная спецификация реализованного API также должна охватить остальные FR-01–FR-16; это не основание исключать их из первого этапа."
+  },
+  "servers": [
+    {
+      "url": "/api"
+    }
+  ],
+  "paths": {
+    "/diagnostic-sessions": {
+      "post": {
+        "operationId": "createDiagnosticSession",
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Успешный результат",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas.json#/$defs/ObjectRef"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Нет действующей сессии",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas.json#/$defs/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Нет доступа",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas.json#/$defs/ApiError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Конфликт версии или идемпотентности",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas.json#/$defs/ApiError"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Ошибка входных данных",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas.json#/$defs/ApiError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Внешний сервис недоступен",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas.json#/$defs/ApiError"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "./schemas.json#/$defs/DiagnosticSessionCreate"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/diagnostic-sessions/{id}": {
+      "get": {
+        "operationId": "getDiagnosticSession",
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Успешный результат",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas.json#/$defs/DiagnosticSessionState"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Нет действующей сессии",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas.json#/$defs/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Нет доступа",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas.json#/$defs/ApiError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Конфликт версии или идемпотентности",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas.json#/$defs/ApiError"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Ошибка входных данных",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas.json#/$defs/ApiError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Внешний сервис недоступен",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas.json#/$defs/ApiError"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        ]
+      }
+    },
+    "/diagnostic-sessions/{id}/question": {
+      "get": {
+        "operationId": "getCurrentPublicQuestion",
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Успешный результат",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas.json#/$defs/PublicQuestion"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Нет действующей сессии",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas.json#/$defs/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Нет доступа",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas.json#/$defs/ApiError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Конфликт версии или идемпотентности",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas.json#/$defs/ApiError"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Ошибка входных данных",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas.json#/$defs/ApiError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Внешний сервис недоступен",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas.json#/$defs/ApiError"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        ]
+      }
+    },
+    "/diagnostic-sessions/{id}/answers": {
+      "post": {
+        "operationId": "submitDiagnosticAnswer",
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Успешный результат",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas.json#/$defs/JobAccepted"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Нет действующей сессии",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas.json#/$defs/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Нет доступа",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas.json#/$defs/ApiError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Конфликт версии или идемпотентности",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas.json#/$defs/ApiError"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Ошибка входных данных",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas.json#/$defs/ApiError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Внешний сервис недоступен",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas.json#/$defs/ApiError"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "./schemas.json#/$defs/AnswerSubmission"
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        ]
+      }
+    },
+    "/diagnostic-sessions/{id}/pause": {
+      "post": {
+        "operationId": "pauseDiagnostic",
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Успешный результат",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas.json#/$defs/ObjectRef"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Нет действующей сессии",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas.json#/$defs/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Нет доступа",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas.json#/$defs/ApiError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Конфликт версии или идемпотентности",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas.json#/$defs/ApiError"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Ошибка входных данных",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas.json#/$defs/ApiError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Внешний сервис недоступен",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas.json#/$defs/ApiError"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "./schemas.json#/$defs/VersionAction"
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        ]
+      }
+    },
+    "/diagnostic-sessions/{id}/resume": {
+      "post": {
+        "operationId": "resumeDiagnostic",
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Успешный результат",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas.json#/$defs/ObjectRef"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Нет действующей сессии",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas.json#/$defs/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Нет доступа",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas.json#/$defs/ApiError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Конфликт версии или идемпотентности",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas.json#/$defs/ApiError"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Ошибка входных данных",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas.json#/$defs/ApiError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Внешний сервис недоступен",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas.json#/$defs/ApiError"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "./schemas.json#/$defs/VersionAction"
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        ]
+      }
+    },
+    "/diagnostic-sessions/{id}/finish": {
+      "post": {
+        "operationId": "finishDiagnostic",
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Успешный результат",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas.json#/$defs/JobAccepted"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Нет действующей сессии",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas.json#/$defs/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Нет доступа",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas.json#/$defs/ApiError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Конфликт версии или идемпотентности",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas.json#/$defs/ApiError"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Ошибка входных данных",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas.json#/$defs/ApiError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Внешний сервис недоступен",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas.json#/$defs/ApiError"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "./schemas.json#/$defs/VersionAction"
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        ]
+      }
+    },
+    "/diagnostic-sessions/{id}/result": {
+      "get": {
+        "operationId": "getDiagnosticResult",
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Успешный результат",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas.json#/$defs/DiagnosticContext"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Нет действующей сессии",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas.json#/$defs/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Нет доступа",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas.json#/$defs/ApiError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Конфликт версии или идемпотентности",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas.json#/$defs/ApiError"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Ошибка входных данных",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas.json#/$defs/ApiError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Внешний сервис недоступен",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas.json#/$defs/ApiError"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        ]
+      }
+    },
+    "/diagnostic-sessions/{id}/reassess": {
+      "post": {
+        "operationId": "reassessDiagnostic",
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Успешный результат",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas.json#/$defs/JobAccepted"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Нет действующей сессии",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas.json#/$defs/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Нет доступа",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas.json#/$defs/ApiError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Конфликт версии или идемпотентности",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas.json#/$defs/ApiError"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Ошибка входных данных",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas.json#/$defs/ApiError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Внешний сервис недоступен",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas.json#/$defs/ApiError"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "./schemas.json#/$defs/VersionAction"
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        ]
+      }
+    },
+    "/problems": {
+      "post": {
+        "operationId": "createProblem",
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Успешный результат",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas.json#/$defs/ObjectRef"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Нет действующей сессии",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas.json#/$defs/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Нет доступа",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas.json#/$defs/ApiError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Конфликт версии или идемпотентности",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas.json#/$defs/ApiError"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Ошибка входных данных",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas.json#/$defs/ApiError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Внешний сервис недоступен",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas.json#/$defs/ApiError"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "./schemas.json#/$defs/ProblemInput"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/problems/{id}/versions": {
+      "post": {
+        "operationId": "reviseProblem",
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Успешный результат",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas.json#/$defs/ObjectRef"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Нет действующей сессии",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas.json#/$defs/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Нет доступа",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas.json#/$defs/ApiError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Конфликт версии или идемпотентности",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas.json#/$defs/ApiError"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Ошибка входных данных",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas.json#/$defs/ApiError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Внешний сервис недоступен",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas.json#/$defs/ApiError"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "./schemas.json#/$defs/ProblemInput"
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        ]
+      }
+    },
+    "/courses/{id}/builds": {
+      "post": {
+        "operationId": "requestCourseBuild",
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Успешный результат",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas.json#/$defs/JobAccepted"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Нет действующей сессии",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas.json#/$defs/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Нет доступа",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas.json#/$defs/ApiError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Конфликт версии или идемпотентности",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas.json#/$defs/ApiError"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Ошибка входных данных",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas.json#/$defs/ApiError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Внешний сервис недоступен",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas.json#/$defs/ApiError"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "./schemas.json#/$defs/BuildRequest"
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        ]
+      }
+    },
+    "/courses/{id}/routes/active": {
+      "get": {
+        "operationId": "getActiveRoute",
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Успешный результат",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas.json#/$defs/RoutePlan"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Нет действующей сессии",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas.json#/$defs/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Нет доступа",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas.json#/$defs/ApiError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Конфликт версии или идемпотентности",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas.json#/$defs/ApiError"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Ошибка входных данных",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas.json#/$defs/ApiError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Внешний сервис недоступен",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas.json#/$defs/ApiError"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        ]
+      }
+    },
+    "/courses/{id}/completion": {
+      "post": {
+        "operationId": "verifyCourseCompletion",
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Успешный результат",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas.json#/$defs/ObjectRef"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Нет действующей сессии",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas.json#/$defs/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Нет доступа",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas.json#/$defs/ApiError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Конфликт версии или идемпотентности",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas.json#/$defs/ApiError"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Ошибка входных данных",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas.json#/$defs/ApiError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Внешний сервис недоступен",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas.json#/$defs/ApiError"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "./schemas.json#/$defs/VersionAction"
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        ]
+      }
+    },
+    "/tasks/{id}/attempts": {
+      "post": {
+        "operationId": "submitAttempt",
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Успешный результат",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas.json#/$defs/JobAccepted"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Нет действующей сессии",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas.json#/$defs/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Нет доступа",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas.json#/$defs/ApiError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Конфликт версии или идемпотентности",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas.json#/$defs/ApiError"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Ошибка входных данных",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas.json#/$defs/ApiError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Внешний сервис недоступен",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas.json#/$defs/ApiError"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "./schemas.json#/$defs/AttemptInput"
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        ]
+      }
+    },
+    "/attempts/{id}/reviews/active": {
+      "get": {
+        "operationId": "getActiveReview",
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Успешный результат",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas.json#/$defs/Review"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Нет действующей сессии",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas.json#/$defs/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Нет доступа",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas.json#/$defs/ApiError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Конфликт версии или идемпотентности",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas.json#/$defs/ApiError"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Ошибка входных данных",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas.json#/$defs/ApiError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Внешний сервис недоступен",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas.json#/$defs/ApiError"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        ]
+      }
+    },
+    "/attempts/{id}/disputes": {
+      "post": {
+        "operationId": "openDispute",
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Успешный результат",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas.json#/$defs/ObjectRef"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Нет действующей сессии",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas.json#/$defs/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Нет доступа",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas.json#/$defs/ApiError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Конфликт версии или идемпотентности",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas.json#/$defs/ApiError"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Ошибка входных данных",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas.json#/$defs/ApiError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Внешний сервис недоступен",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "./schemas.json#/$defs/ApiError"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "./schemas.json#/$defs/VersionAction"
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        ]
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "session": {
+        "type": "apiKey",
+        "in": "cookie",
+        "name": "max_session"
+      }
+    }
+  }
+}

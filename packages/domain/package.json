@@ -1,0 +1,26 @@
+{
+  "name": "@vibework/domain",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsup src/index.ts --format esm --dts --clean",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@vibework/content": "workspace:*",
+    "@vibework/contracts": "workspace:*",
+    "@vibework/ai": "workspace:*",
+    "@vibework/shared": "workspace:*",
+    "pg": "^8.16.3"
+  }
+}

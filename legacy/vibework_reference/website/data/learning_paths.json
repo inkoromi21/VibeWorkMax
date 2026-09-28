@@ -1,0 +1,82 @@
+{
+  "version": 1,
+  "paths": [
+    {
+      "id": "it_dev_backend_junior",
+      "title": "Junior Backend — пошаговый путь",
+      "spheres": ["it_dev"],
+      "tracks": ["backend"],
+      "levels": ["weak", "medium", "strong"],
+      "steps": [
+        {"id": "be-1", "order": 1, "title": "Карта профессии и логика", "goal": "Понять структуру пути backend и базовые идеи CS", "duration_hint": "1–2 нед.", "skills": ["logic", "career_map"], "resource_ids": ["roadmap_backend", "cs50_intro"], "dynamic": [{"adapter": "video", "query": "computer science basics русский"}]},
+        {"id": "be-2", "order": 2, "title": "Основы Python", "goal": "Синтаксис, типы, функции, простые скрипты", "duration_hint": "2–3 нед.", "skills": ["python", "programming"], "resource_ids": ["stepik_python", "ms_learn_python", "fcc_python"], "dynamic": [{"adapter": "exercism", "track": "python"}, {"adapter": "video", "query": "python для начинающих"}]},
+        {"id": "be-3", "order": 3, "title": "Практика: задачи и Git", "goal": "Решать мелкие задачи, версионировать код", "duration_hint": "1–2 нед.", "skills": ["programming", "git"], "resource_ids": ["exercism_python", "git_branching", "github_skills"], "dynamic": [{"adapter": "codewars", "language": "python"}, {"adapter": "github", "query": "python beginner project template"}]},
+        {"id": "be-4", "order": 4, "title": "HTTP и веб-основы", "goal": "Понимать запросы, API, JSON", "duration_hint": "1–2 нед.", "skills": ["http", "api"], "resource_ids": ["mdn_http", "mdn_js"], "dynamic": [{"adapter": "video", "query": "REST API python tutorial"}]},
+        {"id": "be-5", "order": 5, "title": "Backend: сервер и БД", "goal": "Простой API + SQL", "duration_hint": "3–4 нед.", "skills": ["backend", "sql"], "resource_ids": ["odin_fullstack", "sql_academy", "devdocs_python"], "dynamic": [{"adapter": "github", "query": "fastapi starter template"}]},
+        {"id": "be-6", "order": 6, "title": "Пет-проект в портфолио", "goal": "Один законченный проект на GitHub", "duration_hint": "2–3 нед.", "skills": ["portfolio"], "resource_ids": ["github_skills"], "dynamic": [{"adapter": "github", "query": "backend portfolio project ideas"}]},
+        {"id": "be-7", "order": 7, "title": "Алгоритмы (база)", "goal": "Структуры данных и типовые задачи", "duration_hint": "2–4 нед.", "skills": ["algorithms"], "resource_ids": ["leetcode_explore"], "dynamic": [{"adapter": "exercism", "track": "python"}]}
+      ]
+    },
+    {
+      "id": "it_dev_frontend_junior",
+      "title": "Junior Frontend — пошаговый путь",
+      "spheres": ["it_dev"],
+      "tracks": ["frontend"],
+      "levels": ["weak", "medium", "strong"],
+      "steps": [
+        {"id": "fe-1", "order": 1, "title": "Карта frontend", "goal": "Понять последовательность HTML → CSS → JS", "duration_hint": "1 нед.", "skills": ["career_map"], "resource_ids": ["roadmap_frontend"], "dynamic": []},
+        {"id": "fe-2", "order": 2, "title": "HTML и CSS", "goal": "Вёрстка страницы по макету", "duration_hint": "2–3 нед.", "skills": ["html", "css"], "resource_ids": ["mdn_html", "fcc_responsive"], "dynamic": [{"adapter": "video", "query": "html css курс начинающим"}]},
+        {"id": "fe-3", "order": 3, "title": "JavaScript", "goal": "DOM, события, fetch", "duration_hint": "3–4 нед.", "skills": ["javascript"], "resource_ids": ["mdn_js", "exercism_javascript"], "dynamic": [{"adapter": "exercism", "track": "javascript"}]},
+        {"id": "fe-4", "order": 4, "title": "Проект и Git", "goal": "Мини-сайт в репозитории", "duration_hint": "2–3 нед.", "skills": ["git", "portfolio"], "resource_ids": ["git_branching", "github_skills"], "dynamic": [{"adapter": "github", "query": "frontend portfolio template"}]}
+      ]
+    },
+    {
+      "id": "data_junior",
+      "title": "Junior Data / Analytics — пошаговый путь",
+      "spheres": ["data"],
+      "tracks": ["data"],
+      "levels": ["weak", "medium", "strong"],
+      "steps": [
+        {"id": "da-1", "order": 1, "title": "Карта data-направления", "goal": "Понять роли аналитика и data", "duration_hint": "1 нед.", "skills": ["career_map"], "resource_ids": ["roadmap_data_analyst"], "dynamic": []},
+        {"id": "da-2", "order": 2, "title": "Python и SQL", "goal": "База для работы с данными", "duration_hint": "3–4 нед.", "skills": ["python", "sql"], "resource_ids": ["stepik_python", "sql_academy", "kaggle_learn"], "dynamic": [{"adapter": "exercism", "track": "python"}]},
+        {"id": "da-3", "order": 3, "title": "Аналитика и визуализация", "goal": "Pandas-мышление, отчёты", "duration_hint": "2–3 нед.", "skills": ["analytics"], "resource_ids": ["kaggle_learn", "google_ml_crash"], "dynamic": [{"adapter": "video", "query": "pandas tutorial русский"}]},
+        {"id": "da-4", "order": 4, "title": "ML / AI (введение)", "goal": "Понять, когда нужен ML", "duration_hint": "2–4 нед.", "skills": ["ml"], "resource_ids": ["hf_learn", "deeplearning_ai_short"], "dynamic": []}
+      ]
+    },
+    {
+      "id": "design_junior",
+      "title": "Junior UI/UX — пошаговый путь",
+      "spheres": ["design", "creative"],
+      "tracks": ["design"],
+      "levels": ["weak", "medium", "strong"],
+      "steps": [
+        {"id": "ux-1", "order": 1, "title": "Основы UX", "goal": "Принципы и насмотренность", "duration_hint": "1–2 нед.", "skills": ["ux"], "resource_ids": ["google_design"], "dynamic": [{"adapter": "video", "query": "UX design basics"}]},
+        {"id": "ux-2", "order": 2, "title": "Figma", "goal": "Макет и компоненты", "duration_hint": "2–3 нед.", "skills": ["figma", "ui"], "resource_ids": ["figma_learn"], "dynamic": []},
+        {"id": "ux-3", "order": 3, "title": "Кейс в портфолио", "goal": "1 экран с контекстом задачи", "duration_hint": "2 нед.", "skills": ["portfolio"], "resource_ids": [], "dynamic": [{"adapter": "video", "query": "figma portfolio case study"}]}
+      ]
+    },
+    {
+      "id": "marketing_junior",
+      "title": "Digital marketing — старт",
+      "spheres": ["marketing", "sales"],
+      "tracks": ["marketing", "sales"],
+      "levels": ["weak", "medium", "strong"],
+      "steps": [
+        {"id": "mk-1", "order": 1, "title": "Основы digital", "goal": "Воронка, метрики, каналы", "duration_hint": "2 нед.", "skills": ["marketing"], "resource_ids": ["hubspot_academy"], "dynamic": [{"adapter": "video", "query": "digital marketing основы"}]},
+        {"id": "mk-2", "order": 2, "title": "Практика и кейс", "goal": "Учебный креатив или мини-кампания", "duration_hint": "2–3 нед.", "skills": ["portfolio"], "resource_ids": [], "dynamic": []}
+      ]
+    },
+    {
+      "id": "general_career",
+      "title": "Общий путь развития",
+      "spheres": ["other", "mgmt", "finance", "hr_edu", "logistics", "medicine", "education", "engineering", "sport"],
+      "tracks": [],
+      "levels": ["weak", "medium", "strong"],
+      "steps": [
+        {"id": "gen-1", "order": 1, "title": "Самопознание и рынок", "goal": "5 вакансий-ориентиров и список навыков", "duration_hint": "1–2 нед.", "skills": ["career_map"], "resource_ids": [], "dynamic": [{"adapter": "esco", "query": "occupation skills"}]},
+        {"id": "gen-2", "order": 2, "title": "Один инструмент сферы", "goal": "Курс или гайд по выбранному направлению", "duration_hint": "2–4 нед.", "skills": [], "resource_ids": ["hubspot_academy"], "dynamic": [{"adapter": "video", "query": "карьера обучение"}]},
+        {"id": "gen-3", "order": 3, "title": "Кейс или проект", "goal": "Артефакт для резюме", "duration_hint": "2–3 нед.", "skills": ["portfolio"], "resource_ids": [], "dynamic": []}
+      ]
+    }
+  ]
+}

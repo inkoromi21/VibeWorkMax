@@ -1,0 +1,46 @@
+{
+  "name": "vibework-max",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@11.19.0",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "build": "pnpm build:packages && pnpm build:apps",
+    "build:packages": "pnpm --filter './packages/**' --sort build",
+    "build:apps": "pnpm --filter './apps/**' --sort build",
+    "typecheck": "tsc --noEmit -p tsconfig.json && pnpm -r --if-present typecheck",
+    "lint": "eslint .",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "test": "vitest run",
+    "test:integration": "vitest run --config vitest.integration.config.ts",
+    "check:deps": "madge --circular --extensions ts,tsx apps packages",
+    "check:phase0": "node scripts/check-phase0.mjs all",
+    "contracts:generate": "pnpm --filter @vibework/contracts generate",
+    "contracts:check": "pnpm --filter @vibework/contracts check",
+    "migrate": "node-pg-migrate up --migrations-dir migrations --database-url-var DATABASE_URL",
+    "migrate:down:local-test": "node-pg-migrate down 6 --migrations-dir migrations --database-url-var DATABASE_URL",
+    "benchmark:models": "pnpm build:packages && tsx scripts/benchmark-models.ts"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.36.0",
+    "@types/node": "^24.5.2",
+    "@types/pg": "^8.15.5",
+    "ajv": "^8.17.1",
+    "eslint": "^9.36.0",
+    "ioredis": "^5.8.0",
+    "madge": "^8.0.0",
+    "node-pg-migrate": "^8.0.3",
+    "pg": "^8.16.3",
+    "prettier": "^3.6.2",
+    "testcontainers": "^12.1.0",
+    "tsup": "^8.5.0",
+    "typescript": "^5.9.2",
+    "typescript-eslint": "^8.44.1",
+    "vite-tsconfig-paths": "^5.1.4",
+    "vitest": "^3.2.4"
+  }
+}

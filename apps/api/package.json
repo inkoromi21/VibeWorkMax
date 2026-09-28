@@ -1,0 +1,26 @@
+{
+  "name": "@vibework/api",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsup src/index.ts --format esm --clean",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "dev": "tsx watch src/index.ts",
+    "start": "node dist/index.js"
+  },
+  "dependencies": {
+    "@fastify/cookie": "^11.1.2",
+    "@vibework/content": "workspace:*",
+    "@vibework/contracts": "workspace:*",
+    "@vibework/domain": "workspace:*",
+    "@vibework/shared": "workspace:*",
+    "bullmq": "^5.58.5",
+    "fastify": "^5.6.1",
+    "ioredis": "^5.8.0"
+  },
+  "devDependencies": {
+    "tsx": "^4.20.5"
+  }
+}

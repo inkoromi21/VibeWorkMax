@@ -1,0 +1,1539 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/max-contracts/4.0/schemas.json",
+  "title": "MAX common contracts release 4.0",
+  "$defs": {
+    "Constraints": {
+      "type": "object",
+      "properties": {
+        "age_group": {
+          "type": "string",
+          "minLength": 1
+        },
+        "role": {
+          "type": "string",
+          "enum": [
+            "SCHOOL",
+            "STUDENT"
+          ]
+        },
+        "device": {
+          "type": "string",
+          "enum": [
+            "PHONE",
+            "TABLET",
+            "DESKTOP",
+            "UNKNOWN"
+          ]
+        },
+        "tools": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "minItems": 0
+        },
+        "session_minutes": {
+          "anyOf": [
+            {
+              "type": "integer",
+              "minimum": 1
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "weekly_minutes": {
+          "anyOf": [
+            {
+              "type": "integer",
+              "minimum": 1
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "deadline": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "language": {
+          "type": "string",
+          "minLength": 1
+        },
+        "paid_resources_allowed": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "preferred_format": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "age_group",
+        "role",
+        "device",
+        "tools",
+        "session_minutes",
+        "weekly_minutes",
+        "deadline",
+        "language",
+        "paid_resources_allowed",
+        "preferred_format"
+      ],
+      "additionalProperties": false
+    },
+    "Evidence": {
+      "type": "object",
+      "properties": {
+        "evidence_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "user_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "competency_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "criterion_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "observed_result": {
+          "type": "string",
+          "enum": [
+            "PASS",
+            "PARTIAL",
+            "FAIL",
+            "NOT_ASSESSED"
+          ]
+        },
+        "evidence_kind": {
+          "type": "string",
+          "enum": [
+            "CHOICE",
+            "EXPLANATION",
+            "PRACTICE",
+            "SELF_REPORT"
+          ]
+        },
+        "task_family_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "task_version_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "rubric_version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "difficulty": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 3
+        },
+        "assistance_level": {
+          "type": "string",
+          "enum": [
+            "NONE",
+            "HINT",
+            "SOLUTION"
+          ]
+        },
+        "assessment_kind": {
+          "type": "string",
+          "enum": [
+            "LOCAL",
+            "INTEGRATIVE"
+          ]
+        },
+        "source_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "ACTIVE",
+            "REVOKED",
+            "SUPERSEDED",
+            "RESOLVED"
+          ]
+        },
+        "created_at": {
+          "type": "string",
+          "minLength": 1
+        },
+        "evidence_excerpt": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "evidence_id",
+        "user_id",
+        "competency_id",
+        "criterion_id",
+        "observed_result",
+        "evidence_kind",
+        "task_family_id",
+        "task_version_id",
+        "rubric_version",
+        "difficulty",
+        "assistance_level",
+        "assessment_kind",
+        "source_ref",
+        "status",
+        "created_at",
+        "evidence_excerpt"
+      ],
+      "additionalProperties": false
+    },
+    "CompetencyEstimate": {
+      "type": "object",
+      "properties": {
+        "competency_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "mastery_state": {
+          "type": "string",
+          "enum": [
+            "unknown",
+            "needs_foundation",
+            "developing",
+            "demonstrated"
+          ]
+        },
+        "evidence_sufficiency": {
+          "type": "string",
+          "enum": [
+            "insufficient",
+            "limited",
+            "sufficient"
+          ]
+        },
+        "policy_version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "evidence_ids": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "minItems": 0
+        },
+        "passed_criteria": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "minItems": 0
+        },
+        "failed_criteria": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "minItems": 0
+        },
+        "unobserved_criteria": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "minItems": 0
+        },
+        "open_conflict": {
+          "type": "boolean"
+        },
+        "evaluated_at": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "competency_id",
+        "mastery_state",
+        "evidence_sufficiency",
+        "policy_version",
+        "evidence_ids",
+        "passed_criteria",
+        "failed_criteria",
+        "unobserved_criteria",
+        "open_conflict",
+        "evaluated_at"
+      ],
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "mastery_state": {
+                "const": "demonstrated"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "evidence_sufficiency": {
+                "const": "sufficient"
+              },
+              "open_conflict": {
+                "const": false
+              },
+              "evidence_ids": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "minItems": 1
+              }
+            }
+          }
+        }
+      ]
+    },
+    "MasteryPolicy": {
+      "type": "object",
+      "properties": {
+        "policy_version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "competency_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "required_criteria": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "minItems": 1
+        },
+        "required_independent_families": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "minimum_difficulty": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 3
+        },
+        "allowed_assistance": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": [
+              "NONE",
+              "HINT",
+              "SOLUTION"
+            ]
+          },
+          "minItems": 1
+        },
+        "validity_days": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "requires_integrative_task": {
+          "type": "boolean"
+        },
+        "compatible_rubric_versions": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "minItems": 1
+        },
+        "foundation_criteria": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "minItems": 0
+        }
+      },
+      "required": [
+        "policy_version",
+        "competency_id",
+        "required_criteria",
+        "required_independent_families",
+        "minimum_difficulty",
+        "allowed_assistance",
+        "validity_days",
+        "requires_integrative_task",
+        "compatible_rubric_versions",
+        "foundation_criteria"
+      ],
+      "additionalProperties": false
+    },
+    "StepReason": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "enum": [
+            "GAP",
+            "PREREQUISITE_CHECK",
+            "EXPLORATION",
+            "NEW_GOAL",
+            "PRACTICE",
+            "FINAL_ASSESSMENT"
+          ]
+        },
+        "explanation": {
+          "type": "string",
+          "minLength": 1
+        },
+        "evidence_ids": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "minItems": 0
+        },
+        "assumption_reason": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "kind",
+        "explanation",
+        "evidence_ids",
+        "assumption_reason"
+      ],
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "GAP"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "evidence_ids": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "minItems": 1
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "PREREQUISITE_CHECK"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "assumption_reason": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          }
+        }
+      ]
+    },
+    "DiagnosticContext": {
+      "type": "object",
+      "properties": {
+        "schema_version": {
+          "const": "4.0"
+        },
+        "session_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "problem_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "problem_version": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "profile_version": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "evidence_revision": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "goal_type": {
+          "type": "string",
+          "enum": [
+            "DIRECTION",
+            "KNOWLEDGE_GAP",
+            "SKILL",
+            "PRACTICE_READINESS"
+          ]
+        },
+        "confirmed_goal": {
+          "type": "string",
+          "minLength": 1
+        },
+        "completeness": {
+          "type": "string",
+          "enum": [
+            "COMPLETED",
+            "COMPLETED_PARTIAL"
+          ]
+        },
+        "competencies": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/CompetencyEstimate"
+          },
+          "minItems": 0
+        },
+        "interests": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "label": {
+                "type": "string",
+                "minLength": 1
+              },
+              "source": {
+                "const": "self_report"
+              }
+            },
+            "required": [
+              "label",
+              "source"
+            ],
+            "additionalProperties": false
+          },
+          "minItems": 0
+        },
+        "constraints": {
+          "$ref": "#/$defs/Constraints"
+        },
+        "evidence_ids": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "minItems": 0
+        },
+        "unresolved_questions": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "minItems": 0
+        },
+        "recommended_entry": {
+          "type": "object",
+          "properties": {
+            "competency_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "reason": {
+              "$ref": "#/$defs/StepReason"
+            }
+          },
+          "required": [
+            "competency_id",
+            "reason"
+          ],
+          "additionalProperties": false
+        },
+        "method_versions": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "minItems": 0
+        }
+      },
+      "required": [
+        "schema_version",
+        "session_id",
+        "problem_id",
+        "problem_version",
+        "profile_version",
+        "evidence_revision",
+        "goal_type",
+        "confirmed_goal",
+        "completeness",
+        "competencies",
+        "interests",
+        "constraints",
+        "evidence_ids",
+        "unresolved_questions",
+        "recommended_entry",
+        "method_versions"
+      ],
+      "additionalProperties": false
+    },
+    "CourseCompletionPolicy": {
+      "type": "object",
+      "properties": {
+        "policy_version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "target_competency_ids": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "minItems": 1
+        },
+        "mastery_policy_versions": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "minItems": 1
+        },
+        "required_integrative_task_ids": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "minItems": 0
+        },
+        "allow_compatible_prior_evidence": {
+          "type": "boolean"
+        },
+        "block_on_required_evidence_dispute": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "policy_version",
+        "target_competency_ids",
+        "mastery_policy_versions",
+        "required_integrative_task_ids",
+        "allow_compatible_prior_evidence",
+        "block_on_required_evidence_dispute"
+      ],
+      "additionalProperties": false
+    },
+    "RoutePlan": {
+      "type": "object",
+      "properties": {
+        "schema_version": {
+          "const": "4.0"
+        },
+        "course_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "route_version_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "goal_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "problem_version": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "catalog_version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "policy_version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "steps": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "step_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "competency_ids": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "minItems": 1
+              },
+              "prerequisite_step_ids": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "minItems": 0
+              },
+              "block_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "material_version_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "task_version_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "reason": {
+                "$ref": "#/$defs/StepReason"
+              },
+              "estimated_minutes": {
+                "type": "integer",
+                "minimum": 1
+              }
+            },
+            "required": [
+              "step_id",
+              "competency_ids",
+              "prerequisite_step_ids",
+              "block_id",
+              "material_version_id",
+              "task_version_id",
+              "reason",
+              "estimated_minutes"
+            ],
+            "additionalProperties": false
+          },
+          "minItems": 1
+        },
+        "completion_policy": {
+          "$ref": "#/$defs/CourseCompletionPolicy"
+        }
+      },
+      "required": [
+        "schema_version",
+        "course_id",
+        "route_version_id",
+        "goal_id",
+        "problem_version",
+        "catalog_version",
+        "policy_version",
+        "steps",
+        "completion_policy"
+      ],
+      "additionalProperties": false
+    },
+    "BuildRequest": {
+      "type": "object",
+      "properties": {
+        "schema_version": {
+          "const": "4.0"
+        },
+        "request_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "idempotency_key": {
+          "type": "string",
+          "minLength": 1
+        },
+        "course_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "problem_version": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "profile_version": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "evidence_revision": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "catalog_version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "policy_version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "expected_active_route_version": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "diagnostic_context": {
+          "$ref": "#/$defs/DiagnosticContext"
+        }
+      },
+      "required": [
+        "schema_version",
+        "request_id",
+        "idempotency_key",
+        "course_id",
+        "problem_version",
+        "profile_version",
+        "evidence_revision",
+        "catalog_version",
+        "policy_version",
+        "expected_active_route_version",
+        "diagnostic_context"
+      ],
+      "additionalProperties": false
+    },
+    "PublishDecision": {
+      "type": "object",
+      "properties": {
+        "request_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "job_state": {
+          "type": "string",
+          "enum": [
+            "SUCCEEDED",
+            "SUPERSEDED",
+            "FAILED_FINAL"
+          ]
+        },
+        "route_version_id": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "course_version_id": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "mismatched_fields": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "minItems": 0
+        },
+        "active_pair_changed": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "request_id",
+        "job_state",
+        "route_version_id",
+        "course_version_id",
+        "mismatched_fields",
+        "active_pair_changed"
+      ],
+      "additionalProperties": false
+    },
+    "ApiError": {
+      "type": "object",
+      "properties": {
+        "code": {
+          "type": "string",
+          "minLength": 1
+        },
+        "message": {
+          "type": "string",
+          "minLength": 1
+        },
+        "request_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "retryable": {
+          "type": "boolean"
+        },
+        "current_revision": {
+          "anyOf": [
+            {
+              "type": "integer",
+              "minimum": 0
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "code",
+        "message",
+        "request_id",
+        "retryable",
+        "current_revision"
+      ],
+      "additionalProperties": false
+    },
+    "PublicQuestion": {
+      "type": "object",
+      "properties": {
+        "question_instance_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "session_revision": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "question_kind": {
+          "type": "string",
+          "enum": [
+            "SINGLE_CHOICE",
+            "MULTI_CHOICE",
+            "SHORT_TEXT",
+            "PRACTICAL_TEXT",
+            "PREFERENCE"
+          ]
+        },
+        "prompt": {
+          "type": "string",
+          "minLength": 1
+        },
+        "options": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "label": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "required": [
+              "id",
+              "label"
+            ],
+            "additionalProperties": false
+          },
+          "minItems": 0
+        },
+        "public_criteria": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "minItems": 0
+        },
+        "estimated_seconds": {
+          "type": "integer",
+          "minimum": 1
+        }
+      },
+      "required": [
+        "question_instance_id",
+        "session_revision",
+        "question_kind",
+        "prompt",
+        "options",
+        "public_criteria",
+        "estimated_seconds"
+      ],
+      "additionalProperties": false
+    },
+    "AnswerSubmission": {
+      "type": "object",
+      "properties": {
+        "question_instance_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "session_revision": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "client_request_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "answer_kind": {
+          "type": "string",
+          "enum": [
+            "TEXT",
+            "CHOICE",
+            "SKIP",
+            "DONT_KNOW"
+          ]
+        },
+        "answer_payload": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1
+            },
+            {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              },
+              "minItems": 0
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "assistance_reported": {
+          "type": "string",
+          "enum": [
+            "NONE",
+            "HINT",
+            "SOLUTION"
+          ]
+        }
+      },
+      "required": [
+        "question_instance_id",
+        "session_revision",
+        "client_request_id",
+        "answer_kind",
+        "answer_payload",
+        "assistance_reported"
+      ],
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "answer_kind": {
+                "const": "TEXT"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "answer_payload": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "answer_kind": {
+                "const": "CHOICE"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "answer_payload": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "minItems": 1
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "answer_kind": {
+                "enum": [
+                  "SKIP",
+                  "DONT_KNOW"
+                ]
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "answer_payload": {
+                "type": "null"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "JobAccepted": {
+      "type": "object",
+      "properties": {
+        "job_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "QUEUED",
+            "RUNNING"
+          ]
+        },
+        "polling_url": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "job_id",
+        "status",
+        "polling_url"
+      ],
+      "additionalProperties": false
+    },
+    "DiagnosticSessionCreate": {
+      "type": "object",
+      "properties": {
+        "problem_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "problem_version": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "profile_version": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "idempotency_key": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "problem_id",
+        "problem_version",
+        "profile_version",
+        "idempotency_key"
+      ],
+      "additionalProperties": false
+    },
+    "ProblemInput": {
+      "type": "object",
+      "properties": {
+        "raw_text": {
+          "type": "string",
+          "minLength": 1
+        },
+        "confirmed_goal": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "goal_type": {
+          "anyOf": [
+            {
+              "type": "string",
+              "enum": [
+                "DIRECTION",
+                "KNOWLEDGE_GAP",
+                "SKILL",
+                "PRACTICE_READINESS"
+              ]
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "expected_revision": {
+          "anyOf": [
+            {
+              "type": "integer",
+              "minimum": 0
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "idempotency_key": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "raw_text",
+        "confirmed_goal",
+        "goal_type",
+        "expected_revision",
+        "idempotency_key"
+      ],
+      "additionalProperties": false
+    },
+    "VersionAction": {
+      "type": "object",
+      "properties": {
+        "expected_revision": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "idempotency_key": {
+          "type": "string",
+          "minLength": 1
+        },
+        "reason": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "expected_revision",
+        "idempotency_key",
+        "reason"
+      ],
+      "additionalProperties": false
+    },
+    "AttemptInput": {
+      "type": "object",
+      "properties": {
+        "task_version_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "route_version_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "client_request_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "answer_text": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "attachment_ids": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "minItems": 0
+        },
+        "assistance_reported": {
+          "type": "string",
+          "enum": [
+            "NONE",
+            "HINT",
+            "SOLUTION"
+          ]
+        }
+      },
+      "required": [
+        "task_version_id",
+        "route_version_id",
+        "client_request_id",
+        "answer_text",
+        "attachment_ids",
+        "assistance_reported"
+      ],
+      "additionalProperties": false
+    },
+    "ObjectRef": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "revision": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "status": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "id",
+        "revision",
+        "status"
+      ],
+      "additionalProperties": false
+    },
+    "Review": {
+      "type": "object",
+      "properties": {
+        "review_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "attempt_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "rubric_version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "GRADED",
+            "NEEDS_REVIEW",
+            "REVOKED"
+          ]
+        },
+        "task_result": {
+          "type": "string",
+          "enum": [
+            "PASS",
+            "PARTIAL",
+            "FAIL",
+            "NOT_ASSESSED"
+          ]
+        },
+        "criterion_results": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "criterion_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "result": {
+                "type": "string",
+                "enum": [
+                  "PASS",
+                  "PARTIAL",
+                  "FAIL",
+                  "NOT_ASSESSED"
+                ]
+              },
+              "evidence_excerpt": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "criterion_id",
+              "result",
+              "evidence_excerpt"
+            ],
+            "additionalProperties": false
+          },
+          "minItems": 0
+        },
+        "evidence_ids": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "minItems": 0
+        },
+        "explanation": {
+          "type": "string",
+          "minLength": 1
+        },
+        "evidence_revision": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "required": [
+        "review_id",
+        "attempt_id",
+        "rubric_version",
+        "status",
+        "task_result",
+        "criterion_results",
+        "evidence_ids",
+        "explanation",
+        "evidence_revision"
+      ],
+      "additionalProperties": false
+    },
+    "DiagnosticSessionState": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "revision": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "CREATED",
+            "PLANNED",
+            "IN_PROGRESS",
+            "ANALYZING",
+            "COMPLETED",
+            "COMPLETED_PARTIAL",
+            "PAUSED",
+            "NEEDS_REVIEW",
+            "FAILED_RETRYABLE",
+            "SUPERSEDED",
+            "CANCELLED"
+          ]
+        },
+        "question": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/PublicQuestion"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "completed_areas": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "minItems": 0
+        },
+        "remaining_areas": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "minItems": 0
+        }
+      },
+      "required": [
+        "id",
+        "revision",
+        "status",
+        "question",
+        "completed_areas",
+        "remaining_areas"
+      ],
+      "additionalProperties": false
+    }
+  }
+}
