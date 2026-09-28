@@ -18,6 +18,18 @@ first dependency install and build.
 The Git deploy key on the VPS must have read-only access to
 `inkoromi21/VibeWorkMax`.
 
+Create a dedicated key with a passphrase. Do not pass `-N ""`: SSH will ask
+for this passphrase on every deployment.
+
+```sh
+install -d -m 0700 /root/.ssh
+ssh-keygen -t ed25519 -f /root/.ssh/id_ed25519_vibeworkmax -C "vibeworkmax-vps"
+cat /root/.ssh/id_ed25519_vibeworkmax.pub
+```
+
+Add the printed public key in the GitHub repository under **Settings → Deploy
+keys** with read-only access. The private key remains only on the VPS.
+
 ## First installation
 
 Run as root after cloning the repository to `/opt/vibeworkmax`:
@@ -68,8 +80,12 @@ its `server_name` and routing have been reconciled with that site.
 ## Routine update
 
 ```sh
-cd /opt/vibeworkmax && git pull origin main && bash deploy/vps-native-update.sh
+cd /opt/vibeworkmax && bash deploy/vps-native-pull-and-update.sh
 ```
+
+The command asks for the deploy-key passphrase, pulls only a fast-forward
+update from `main`, then builds and restarts the services. It does not store
+the passphrase in `ssh-agent` and refuses non-interactive execution.
 
 ## Verification and recovery
 
