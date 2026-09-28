@@ -52,8 +52,15 @@ if (process.env.NODE_ENV !== 'test') {
   void dispatch();
   const health = Fastify({ loggerInstance: logger });
   health.get('/health', () => ({ status: jobs.worker.isRunning() ? 'ok' : 'starting' }));
+  // The endpoint is consumed by the local Nginx/systemd health checks only.
+  // Do not bind 0.0.0.0: Fastify then enumerates host interfaces for logging,
+  // which is unavailable on some native VPS kernels.
+  const healthHost =
+    process.env.WORKER_HEALTH_HOST === '0.0.0.0'
+      ? '127.0.0.1'
+      : process.env.WORKER_HEALTH_HOST ?? '127.0.0.1';
   await health.listen({
-    host: process.env.WORKER_HEALTH_HOST ?? '0.0.0.0',
+    host: healthHost,
     port: Number(process.env.WORKER_HEALTH_PORT ?? 3001),
   });
 
