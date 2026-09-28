@@ -175,8 +175,10 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
       request.body,
       process.env.MAX_MODE === 'enabled' ? process.env.MAX_IDENTITY_ENCRYPTION_KEY : undefined,
     );
-    const requireProviderEventId =
-      options.requireMaxProviderEventId ?? process.env.MAX_MODE === 'enabled';
+    // MAX's documented Update schema has no top-level delivery/event id.  The
+    // webhook parser derives a deterministic id from timestamp, chat, actor and
+    // message/callback identity so redeliveries remain idempotent.
+    const requireProviderEventId = options.requireMaxProviderEventId ?? false;
     if (requireProviderEventId && !update.hasProviderEventId) {
       metrics.increment('rejected');
       throw new ApplicationError({

@@ -19,7 +19,12 @@ export interface MaxUpdate {
   callback_id?: string;
   payload?: string;
   user?: { user_id?: string | number };
-  message?: { id?: string | number; text?: string; sender?: { user_id?: string | number } };
+  message?: {
+    id?: string | number;
+    text?: string;
+    body?: { mid?: string | number; text?: string };
+    sender?: { user_id?: string | number };
+  };
   callback?: { callback_id?: string; payload?: string; user?: { user_id?: string | number } };
 }
 
@@ -139,6 +144,10 @@ function actorId(source: MaxUpdate): string | undefined {
   return value === undefined ? undefined : String(value);
 }
 
+function messageId(source: MaxUpdate): string | number | undefined {
+  return source.message?.body?.mid ?? source.message?.id;
+}
+
 /** Constant-time equality also for secrets of unequal length. */
 export function verifyMaxWebhookSecret(
   actual: string | undefined,
@@ -165,7 +174,9 @@ export function parseMaxUpdate(value: unknown, identityEncryptionKey?: string): 
   const providerId =
     stringField(source.event_id) ??
     (source.update_id === undefined ? undefined : String(source.update_id));
-  const text = stringField(source.text) ?? stringField(source.message?.text);
+  // MAX sends message text and its durable mid inside message.body.
+  const text =
+    stringField(source.text) ?? stringField(source.message?.body?.text) ?? stringField(source.message?.text);
   const callback = stringField(source.payload) ?? stringField(source.callback?.payload);
   const callbackId = stringField(source.callback_id) ?? stringField(source.callback?.callback_id);
   if (
@@ -188,7 +199,7 @@ export function parseMaxUpdate(value: unknown, identityEncryptionKey?: string): 
       source.timestamp,
       source.chat_id,
       actor,
-      source.message?.id,
+      messageId(source),
       callbackId,
     ]);
   if (!/^(?:[A-Za-z0-9._:-]{1,200}|derived:[a-f0-9]{64})$/.test(eventId)) {

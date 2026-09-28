@@ -99,19 +99,19 @@ describe('MAX webhook', () => {
     await app.close();
   });
 
-  it('accepts the documented update_type shape but blocks derived ids in production mode', async () => {
+  it('accepts the documented MAX message shape and derives an idempotency key', async () => {
     const update = parseMaxUpdate({
       update_type: 'message_created',
       timestamp: 1,
       chat_id: 7,
-      message: { id: 4, text: 'hello', sender: { user_id: 1 } },
+      message: { body: { mid: 'mid-4', text: 'hello' }, sender: { user_id: 1 } },
     });
     expect(update.type).toBe('message_created');
     expect(update.hasProviderEventId).toBe(false);
+    expect(update.text).toBe('hello');
     const app = buildServer({
       registerJobs: false,
       maxWebhookSecret: 'expected',
-      requireMaxProviderEventId: true,
       webhookEnqueuer: { enqueueMaxUpdate: () => Promise.resolve() },
     });
     const response = await app.inject({
@@ -122,10 +122,10 @@ describe('MAX webhook', () => {
         update_type: 'message_created',
         timestamp: 1,
         chat_id: 7,
-        message: { id: 4, text: 'hello', sender: { user_id: 1 } },
+        message: { body: { mid: 'mid-4', text: 'hello' }, sender: { user_id: 1 } },
       },
     });
-    expect(response.statusCode).toBe(503);
+    expect(response.statusCode).toBe(200);
     await app.close();
   });
 
