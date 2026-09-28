@@ -103,9 +103,17 @@ export async function processMaxUpdate(
     process.env.MAX_MINI_APP_URL,
   ).handle(command);
   await persistEffects(pool, row, transition);
-  if (row.payload.callback_id && transport.acknowledgeCallback)
-    await transport.acknowledgeCallback(row.payload.callback_id);
   await dispatchReplies(pool, row.encrypted_recipient, eventId, transport);
+  // Acknowledging the pressed inline button only affects MAX's transient UI.
+  // It must never prevent the durable next step from reaching the user.
+  if (row.payload.callback_id && transport.acknowledgeCallback) {
+    try {
+      await transport.acknowledgeCallback(row.payload.callback_id);
+    } catch {
+      // The reply is already delivered and the callback expires quickly, so a
+      // retry here can duplicate a provider-side notification. Keep processing.
+    }
+  }
   await pool.query(
     `UPDATE max_webhook_events SET status = 'PROCESSED', processed_at = now() WHERE event_id = $1 AND status <> 'PROCESSED'`,
     [eventId],
