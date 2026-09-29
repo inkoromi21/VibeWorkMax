@@ -15,5 +15,8 @@
     "build": "tsup src/index.ts --format esm --dts --clean",
     "typecheck": "tsc --noEmit -p tsconfig.json"
   },
-  "dependencies": {}
+  "dependencies": {
+    "ajv": "^8.17.1",
+    "pg": "^8.16.3"
+  }
 }

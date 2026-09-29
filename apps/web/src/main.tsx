@@ -27,6 +27,17 @@ interface AppState {
     version: number;
   } | null;
   diagnosticProfile?: { educationTrack: 'school' | 'student'; interestIds?: string[] };
+  canonicalDiagnostic?: {
+    sessionId: string;
+    problemVersionId: string;
+    sessionRevision: number;
+    questionInstanceId: string | null;
+    publicQuestion: {
+      question_kind?: string;
+      prompt?: string;
+      options?: { id: string; label: string }[];
+    } | null;
+  };
   diagnostic: { index: number; paused: boolean; completed: boolean; additionalConsent: boolean };
   result: {
     version: number;
@@ -117,7 +128,7 @@ function useApp() {
     const connect = async () => {
       try {
         const session = await fetch(
-          bridge.initData ? '/mini-app/session' : '/mini-app/dev-session',
+          bridge.initData ? '/api/mini-app/session' : '/api/mini-app/dev-session',
           {
             method: 'POST',
             credentials: 'include',
@@ -127,17 +138,24 @@ function useApp() {
         );
         if (!session.ok) throw new Error('session unavailable');
         const token = (await session.json()) as { csrfToken: string };
-        const bootstrap = await fetch('/mini-app/bootstrap', { credentials: 'include' });
+        const bootstrap = await fetch('/api/mini-app/bootstrap', { credentials: 'include' });
         if (!bootstrap.ok) throw new Error('bootstrap unavailable');
         const payload = (await bootstrap.json()) as {
           state: AppState;
           csrfToken: string;
           questions: Question[];
+          access?: { allowed: boolean; reason?: string };
         };
         setState(payload.state);
         setQuestions(payload.questions);
         setCsrf(payload.csrfToken || token.csrfToken);
         setMode('connected');
+        if (payload.access?.allowed === false)
+          setNotice(
+            payload.access.reason === 'LEGAL_CONFIGURATION_MISSING'
+              ? 'Сохранение данных временно недоступно: юридические документы не настроены.'
+              : 'Для сохранения данных завершите подтверждение согласия и возраста в боте.',
+          );
       } catch {
         setMode('demo');
         setNotice('Demo-режим: серверная сессия недоступна, данные не сохраняются.');
@@ -149,7 +167,7 @@ function useApp() {
     if (mode !== 'connected') return null;
     const response = await fetch(path, {
       method:
-        path === '/mini-app/problem-draft' || path === '/mini-app/notification-preferences'
+        path === '/api/mini-app/problem-draft' || path === '/api/mini-app/notification-preferences'
           ? 'PUT'
           : 'POST',
       credentials: 'include',
@@ -164,7 +182,12 @@ function useApp() {
       const error = (await response.json().catch(() => ({}))) as { message?: string };
       throw new Error(error.message ?? 'Не удалось сохранить изменения');
     }
-    const payload = (await response.json()) as { state?: AppState; review?: { feedback: string } };
+    const payload = (await response.json()) as {
+      state?: AppState;
+      review?: { feedback: string; attemptId?: string; status?: 'PENDING' | 'READY' };
+      id?: string;
+      status?: string;
+    };
     if (payload.state) setState(payload.state);
     return payload;
   };
@@ -220,7 +243,7 @@ function Problem({ app }: { app: AppModel }) {
   const navigate = useNavigate();
   const submit = async () => {
     try {
-      await app.mutate('/mini-app/problems', { text });
+      await app.mutate('/api/mini-app/problems', { text });
       if (app.mode !== 'connected')
         app.setState((state) => ({
           ...state,
@@ -260,7 +283,9 @@ function Problem({ app }: { app: AppModel }) {
             setText(event.target.value);
             app.bridge.setUnsaved(true);
           }}
-          onBlur={() => void app.mutate('/mini-app/problem-draft', { text }).catch(() => undefined)}
+          onBlur={() =>
+            void app.mutate('/api/mini-app/problem-draft', { text }).catch(() => undefined)
+          }
           placeholder="Например: не понимаю, как проверить решение задачи"
         />
       </label>
@@ -290,7 +315,20 @@ function Diagnosis({ app }: { app: AppModel }) {
   const [interests, setInterests] = useState('');
   const index = app.state.diagnostic.index;
   const questions = app.questions;
-  const question = questions[index];
+  const canonical = app.state.canonicalDiagnostic;
+  const question = canonical?.publicQuestion
+    ? {
+        id: canonical.questionInstanceId ?? 'completed',
+        kind:
+          canonical.publicQuestion.question_kind === 'SHORT_TEXT'
+            ? 'short'
+            : canonical.publicQuestion.question_kind === 'PREFERENCE'
+              ? 'preference'
+              : 'single',
+        prompt: canonical.publicQuestion.prompt ?? '',
+        options: canonical.publicQuestion.options?.map((option) => option.label),
+      }
+    : questions[index];
   if (!app.state.problem?.classification.type)
     return (
       <section className="card stack">
@@ -305,7 +343,7 @@ function Diagnosis({ app }: { app: AppModel }) {
           ].map(([label, type]) => (
             <button
               key={type}
-              onClick={() => void app.mutate('/mini-app/problems/clarification', { type })}
+              onClick={() => void app.mutate('/api/mini-app/problems/clarification', { type })}
             >
               {label}
             </button>
@@ -320,7 +358,7 @@ function Diagnosis({ app }: { app: AppModel }) {
       .filter(Boolean)
       .slice(0, 3);
     const saveProfile = (educationTrack: 'school' | 'student') => {
-      void app.mutate('/mini-app/diagnostic-profile', {
+      void app.mutate('/api/mini-app/diagnostic-profile', {
         educationTrack,
         ...(app.state.problem?.classification.type === 'DIRECTION' ? { interestIds } : {}),
       });
@@ -359,7 +397,16 @@ function Diagnosis({ app }: { app: AppModel }) {
     action: 'answer' | 'skip' | 'unknown' | 'pause' | 'resume' | 'finish' | 'more',
     value?: string,
   ) => {
-    await app.mutate('/mini-app/diagnosis', { action, answer: value });
+    await app.mutate('/api/mini-app/diagnosis', {
+      action,
+      answer: value,
+      ...(canonical?.questionInstanceId
+        ? {
+            questionInstanceId: canonical.questionInstanceId,
+            sessionRevision: canonical.sessionRevision,
+          }
+        : {}),
+    });
     if (app.mode !== 'connected')
       app.setState((state) => ({
         ...state,
@@ -500,7 +547,7 @@ function Result({ app }: { app: AppModel }) {
   );
   const navigate = useNavigate();
   const save = async () => {
-    await app.mutate('/mini-app/goals', { text: goal });
+    await app.mutate('/api/mini-app/goals', { text: goal });
     if (app.mode !== 'connected')
       app.setState((state) => ({
         ...state,
@@ -587,8 +634,28 @@ function Lesson({ app }: { app: AppModel }) {
   const [answer, setAnswer] = useState('');
   const [submitted, setSubmitted] = useState(false);
   const [review, setReview] = useState('');
+  const [reviewStatus, setReviewStatus] = useState<'PENDING' | 'READY'>('PENDING');
+  const [attemptId, setAttemptId] = useState('');
+  const [disputeStatus, setDisputeStatus] = useState('');
+  useEffect(() => {
+    if (!attemptId || reviewStatus === 'READY' || app.mode !== 'connected') return;
+    const refresh = async () => {
+      const response = await fetch(`/api/mini-app/attempts/${attemptId}/review`, {
+        credentials: 'include',
+      });
+      if (!response.ok) return;
+      const latest = (await response.json()) as {
+        status: 'PENDING' | 'READY';
+        feedback: string;
+      };
+      setReviewStatus(latest.status);
+      setReview(latest.feedback);
+    };
+    const timer = window.setInterval(() => void refresh().catch(() => undefined), 2_000);
+    return () => window.clearInterval(timer);
+  }, [attemptId, reviewStatus, app.mode]);
   const submit = async () => {
-    const response = await app.mutate('/mini-app/attempts', { answer });
+    const response = await app.mutate('/api/mini-app/attempts', { answer });
     if (app.mode !== 'connected')
       app.setState((state) => ({
         ...state,
@@ -597,6 +664,8 @@ function Lesson({ app }: { app: AppModel }) {
       }));
     setSubmitted(true);
     setReview(response?.review?.feedback ?? 'Попытка отправлена на проверку.');
+    setReviewStatus(response?.review?.status === 'READY' ? 'READY' : 'PENDING');
+    setAttemptId(response?.review?.attemptId ?? '');
   };
   return (
     <section className="card stack">
@@ -626,20 +695,33 @@ function Lesson({ app }: { app: AppModel }) {
           <p role="status" className="notice">
             {review}
           </p>
-          <h2>Review</h2>
+          <h2>{reviewStatus === 'READY' ? 'Проверка' : 'Проверка выполняется'}</h2>
           <p>Критерии DEMO: понятное рассуждение, проверяемый шаг, самостоятельность.</p>
           <div className="actions">
             <button
               onClick={() => {
                 setSubmitted(false);
                 setAnswer('');
+                setAttemptId('');
               }}
             >
               Новая попытка
             </button>
-            <button className="secondary" disabled title="Нужна утверждённая operator-интеграция">
-              Оспорить review (недоступно)
+            <button
+              className="secondary"
+              disabled={!attemptId || reviewStatus !== 'READY' || app.mode !== 'connected'}
+              onClick={() =>
+                void app
+                  .mutate('/api/mini-app/disputes', {
+                    attemptId,
+                    reason: 'Прошу проверить review повторно',
+                  })
+                  .then(() => setDisputeStatus('Спор сохранён и ожидает рассмотрения.'))
+              }
+            >
+              Оспорить review
             </button>
+            {disputeStatus ? <p role="status">{disputeStatus}</p> : null}
           </div>
         </>
       ) : (
@@ -653,9 +735,10 @@ function Lesson({ app }: { app: AppModel }) {
 
 function Progress({ app }: { app: AppModel }) {
   const [deleteOpen, setDeleteOpen] = useState(false);
+  const [dataStatus, setDataStatus] = useState('');
   const deleteButtonRef = useRef<HTMLButtonElement>(null);
   const toggleNotifications = async () => {
-    await app.mutate('/mini-app/notification-preferences', {
+    await app.mutate('/api/mini-app/notification-preferences', {
       enabled: !app.state.notificationsEnabled,
     });
     if (app.mode !== 'connected')
@@ -664,6 +747,26 @@ function Progress({ app }: { app: AppModel }) {
         revision: state.revision + 1,
         notificationsEnabled: !state.notificationsEnabled,
       }));
+  };
+  const exportData = async () => {
+    const result = await app.mutate('/api/mini-app/export-requests', {});
+    if (result?.id && result.status === 'READY') {
+      await app.bridge.download(
+        `/api/mini-app/export-requests/${encodeURIComponent(result.id)}/download`,
+        `vibework-export-${result.id}.json`,
+      );
+      setDataStatus('Экспорт готов и передан клиенту MAX для скачивания.');
+    }
+  };
+  const requestDeletion = async () => {
+    const result = await app.mutate('/api/mini-app/deletion-requests', {});
+    setDataStatus(
+      result?.status === 'PENDING_POLICY'
+        ? 'Запрос сохранён со статусом PENDING_POLICY.'
+        : 'Запрос удаления сохранён.',
+    );
+    setDeleteOpen(false);
+    requestAnimationFrame(() => deleteButtonRef.current?.focus());
   };
   return (
     <section className="card stack">
@@ -694,8 +797,8 @@ function Progress({ app }: { app: AppModel }) {
       </label>
       <div className="actions">
         <Link to="/problem">Новый запрос</Link>
-        <button disabled title="Нужна утверждённая export-интеграция">
-          Экспортировать данные (недоступно)
+        <button disabled={app.mode !== 'connected'} onClick={() => void exportData()}>
+          Экспортировать данные
         </button>
         <button ref={deleteButtonRef} className="ghost" onClick={() => setDeleteOpen(true)}>
           Удалить данные
@@ -705,9 +808,9 @@ function Progress({ app }: { app: AppModel }) {
         <section className="notice" role="dialog" aria-modal="true" aria-labelledby="delete-title">
           <h2 id="delete-title">Подтвердите удаление</h2>
           <p>
-            В production удаление заблокировано до утверждённой политики хранения. В demo данные не
-            являются настоящим аккаунтом.
+            Запрос будет сохранён, но останется PENDING_POLICY до утверждения политики хранения.
           </p>
+          <button onClick={() => void requestDeletion()}>Создать запрос удаления</button>
           <button
             className="secondary"
             autoFocus
@@ -720,6 +823,7 @@ function Progress({ app }: { app: AppModel }) {
           </button>
         </section>
       ) : null}
+      {dataStatus ? <p role="status">{dataStatus}</p> : null}
     </section>
   );
 }

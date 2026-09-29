@@ -11,9 +11,14 @@
       "userInput": "Не знаю, что выбрать после школы.",
       "approvedContext": { "catalogVersion": "demo-v1" },
       "domainContext": { "allowedIds": [], "allowedUrls": [] },
-      "expectedOutput": { "clarification": "Что для вас сейчас важнее: интересы, предметы или формат будущей работы?" },
+      "expectedOutput": {
+        "clarification": "Что для вас сейчас важнее: интересы, предметы или формат будущей работы?"
+      },
       "sourceExpectation": { "status": "NOT_APPLICABLE" },
-      "rubric": { "status": "NOT_MEASURABLE", "reason": "No approved evaluation rubric is present in the repository." }
+      "rubric": {
+        "status": "NOT_MEASURABLE",
+        "reason": "No approved evaluation rubric is present in the repository."
+      }
     },
     {
       "id": "question-variant-knowledge-gap-v1",
@@ -21,10 +26,16 @@
       "templateId": "question-variant",
       "userInput": "Мне трудно с дробями.",
       "approvedContext": { "optionIds": ["fractions-basics", "fractions-practice"] },
-      "domainContext": { "allowedIds": ["fractions-basics", "fractions-practice"], "allowedUrls": [] },
+      "domainContext": {
+        "allowedIds": ["fractions-basics", "fractions-practice"],
+        "allowedUrls": []
+      },
       "expectedOutput": { "question": "С чего начнём?", "optionIds": ["fractions-basics"] },
       "sourceExpectation": { "status": "NOT_APPLICABLE" },
-      "rubric": { "status": "NOT_MEASURABLE", "reason": "No approved evaluation rubric is present in the repository." }
+      "rubric": {
+        "status": "NOT_MEASURABLE",
+        "reason": "No approved evaluation rubric is present in the repository."
+      }
     },
     {
       "id": "explanation-skill-source-fidelity-v1",
@@ -32,21 +43,53 @@
       "templateId": "explanation",
       "userInput": "Объясни, как начать делать веб-страницы.",
       "approvedContext": { "referenceIds": ["html-intro"], "urls": ["https://demo.example/html"] },
-      "domainContext": { "allowedIds": ["html-intro"], "allowedUrls": ["https://demo.example/html"] },
-      "expectedOutput": { "explanation": "HTML задаёт структуру страницы.", "referenceIds": ["html-intro"], "urls": ["https://demo.example/html"] },
-      "sourceExpectation": { "status": "REQUIRED", "referenceIds": ["html-intro"], "urls": ["https://demo.example/html"] },
-      "rubric": { "status": "NOT_MEASURABLE", "reason": "No approved evaluation rubric is present in the repository." }
+      "domainContext": {
+        "allowedIds": ["html-intro"],
+        "allowedUrls": ["https://demo.example/html"]
+      },
+      "expectedOutput": {
+        "explanation": "HTML задаёт структуру страницы.",
+        "referenceIds": ["html-intro"],
+        "urls": ["https://demo.example/html"]
+      },
+      "sourceExpectation": {
+        "status": "REQUIRED",
+        "referenceIds": ["html-intro"],
+        "urls": ["https://demo.example/html"]
+      },
+      "rubric": {
+        "status": "NOT_MEASURABLE",
+        "reason": "No approved evaluation rubric is present in the repository."
+      }
     },
     {
       "id": "lesson-practice-readiness-source-fidelity-v1",
       "requestType": "PRACTICE_READINESS",
       "templateId": "lesson",
       "userInput": "Хочу подготовиться к первой учебной практике.",
-      "approvedContext": { "referenceIds": ["practice-checklist"], "urls": ["https://demo.example/practice"] },
-      "domainContext": { "allowedIds": ["practice-checklist"], "allowedUrls": ["https://demo.example/practice"] },
-      "expectedOutput": { "title": "Подготовка к практике", "steps": ["Выберите одну задачу из чек-листа."], "referenceIds": ["practice-checklist"], "urls": ["https://demo.example/practice"] },
-      "sourceExpectation": { "status": "REQUIRED", "referenceIds": ["practice-checklist"], "urls": ["https://demo.example/practice"] },
-      "rubric": { "status": "NOT_MEASURABLE", "reason": "No approved evaluation rubric is present in the repository." }
+      "approvedContext": {
+        "referenceIds": ["practice-checklist"],
+        "urls": ["https://demo.example/practice"]
+      },
+      "domainContext": {
+        "allowedIds": ["practice-checklist"],
+        "allowedUrls": ["https://demo.example/practice"]
+      },
+      "expectedOutput": {
+        "title": "Подготовка к практике",
+        "steps": ["Выберите одну задачу из чек-листа."],
+        "referenceIds": ["practice-checklist"],
+        "urls": ["https://demo.example/practice"]
+      },
+      "sourceExpectation": {
+        "status": "REQUIRED",
+        "referenceIds": ["practice-checklist"],
+        "urls": ["https://demo.example/practice"]
+      },
+      "rubric": {
+        "status": "NOT_MEASURABLE",
+        "reason": "No approved evaluation rubric is present in the repository."
+      }
     },
     {
       "id": "feedback-structured-v1",
@@ -54,21 +97,55 @@
       "templateId": "feedback",
       "userInput": "Я сделал простую HTML-страницу.",
       "approvedContext": { "referenceIds": ["html-intro"], "urls": ["https://demo.example/html"] },
-      "domainContext": { "allowedIds": ["html-intro"], "allowedUrls": ["https://demo.example/html"] },
-      "expectedOutput": { "feedback": "Структура страницы уже есть.", "nextStep": "Добавьте заголовок и один абзац.", "referenceIds": ["html-intro"], "urls": ["https://demo.example/html"] },
-      "sourceExpectation": { "status": "REQUIRED", "referenceIds": ["html-intro"], "urls": ["https://demo.example/html"] },
-      "rubric": { "status": "NOT_MEASURABLE", "reason": "No approved evaluation rubric is present in the repository." }
+      "domainContext": {
+        "allowedIds": ["html-intro"],
+        "allowedUrls": ["https://demo.example/html"]
+      },
+      "expectedOutput": {
+        "feedback": "Структура страницы уже есть.",
+        "nextStep": "Добавьте заголовок и один абзац.",
+        "referenceIds": ["html-intro"],
+        "urls": ["https://demo.example/html"]
+      },
+      "sourceExpectation": {
+        "status": "REQUIRED",
+        "referenceIds": ["html-intro"],
+        "urls": ["https://demo.example/html"]
+      },
+      "rubric": {
+        "status": "NOT_MEASURABLE",
+        "reason": "No approved evaluation rubric is present in the repository."
+      }
     },
     {
       "id": "replan-structured-v1",
       "requestType": "KNOWLEDGE_GAP",
       "templateId": "replan",
       "userInput": "У меня есть десять минут, а прежний план слишком длинный.",
-      "approvedContext": { "nextStepIds": ["fractions-basics"], "referenceIds": ["fractions-basics"], "urls": ["https://demo.example/fractions"] },
-      "domainContext": { "allowedIds": ["fractions-basics"], "allowedUrls": ["https://demo.example/fractions"] },
-      "expectedOutput": { "summary": "Сократим план до одного шага.", "nextStepIds": ["fractions-basics"], "referenceIds": ["fractions-basics"], "urls": ["https://demo.example/fractions"] },
-      "sourceExpectation": { "status": "REQUIRED", "referenceIds": ["fractions-basics"], "urls": ["https://demo.example/fractions"] },
-      "rubric": { "status": "NOT_MEASURABLE", "reason": "No approved evaluation rubric is present in the repository." }
+      "approvedContext": {
+        "nextStepIds": ["fractions-basics"],
+        "referenceIds": ["fractions-basics"],
+        "urls": ["https://demo.example/fractions"]
+      },
+      "domainContext": {
+        "allowedIds": ["fractions-basics"],
+        "allowedUrls": ["https://demo.example/fractions"]
+      },
+      "expectedOutput": {
+        "summary": "Сократим план до одного шага.",
+        "nextStepIds": ["fractions-basics"],
+        "referenceIds": ["fractions-basics"],
+        "urls": ["https://demo.example/fractions"]
+      },
+      "sourceExpectation": {
+        "status": "REQUIRED",
+        "referenceIds": ["fractions-basics"],
+        "urls": ["https://demo.example/fractions"]
+      },
+      "rubric": {
+        "status": "NOT_MEASURABLE",
+        "reason": "No approved evaluation rubric is present in the repository."
+      }
     }
   ]
 }

@@ -1,0 +1,120 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "MAX Mini App API",
+    "version": "1.0.0",
+    "description": "Public reverse-proxy paths for the mini app. The API process receives the same paths without /api."
+  },
+  "servers": [{ "url": "/api" }],
+  "paths": {
+    "/mini-app/session": {
+      "post": { "summary": "Verify MAX launch data and create a protected session", "responses": { "201": { "description": "Session created" }, "401": { "$ref": "#/components/responses/Error" } } },
+      "delete": { "summary": "Revoke the current session", "responses": { "204": { "description": "Session revoked" } } }
+    },
+    "/mini-app/bootstrap": {
+      "get": { "summary": "Read the current server state", "responses": { "200": { "description": "Current state" }, "401": { "$ref": "#/components/responses/Error" } } }
+    },
+    "/mini-app/problem-draft": {
+      "put": { "summary": "Save a problem draft", "responses": { "200": { "description": "Draft saved" }, "409": { "$ref": "#/components/responses/Error" } } }
+    },
+    "/mini-app/problems": {
+      "post": { "summary": "Classify the confirmed problem", "responses": { "200": { "description": "Classification returned" } } }
+    },
+    "/mini-app/problems/clarification": {
+      "post": { "summary": "Confirm the request type", "responses": { "200": { "description": "Type confirmed" } } }
+    },
+    "/mini-app/diagnostic-profile": {
+      "post": {
+        "summary": "Create a canonical diagnostic session and issue its first question",
+        "responses": { "200": { "$ref": "#/components/responses/DiagnosticQuestion" }, "403": { "$ref": "#/components/responses/Error" } }
+      }
+    },
+    "/mini-app/diagnosis": {
+      "post": {
+        "summary": "Answer, skip, pause, resume, finish, or consent to more questions",
+        "parameters": [{ "in": "header", "name": "Idempotency-Key", "required": true, "schema": { "type": "string" } }],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/DiagnosticAction" } } } },
+        "responses": { "200": { "$ref": "#/components/responses/DiagnosticQuestion" }, "409": { "$ref": "#/components/responses/Error" } }
+      }
+    },
+    "/mini-app/goals": { "post": { "summary": "Save a versioned goal and publish a route", "responses": { "200": { "description": "Goal and route saved" } } } },
+    "/mini-app/routes/active": { "get": { "summary": "Read the active route", "responses": { "200": { "description": "Active route or unavailable state" } } } },
+    "/mini-app/progress": { "get": { "summary": "Read progress, mastery, and evidence", "responses": { "200": { "description": "Progress read model" } } } },
+    "/mini-app/attempts": { "post": { "summary": "Create an immutable attempt and review", "responses": { "201": { "description": "Attempt accepted" } } } },
+    "/mini-app/attempts/{attemptId}/review": {
+      "get": {
+        "summary": "Read the latest immutable review version for an owned attempt",
+        "parameters": [{ "in": "path", "name": "attemptId", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+        "responses": { "200": { "description": "Latest review version" }, "404": { "$ref": "#/components/responses/Error" } }
+      }
+    },
+    "/mini-app/disputes": { "post": { "summary": "Save a dispute for an owned attempt", "responses": { "201": { "description": "Dispute saved" } } } },
+    "/mini-app/attachments": {
+      "post": {
+        "summary": "Upload up to 5 MiB to quarantine for an owned attempt; only a clean ClamAV scan releases it",
+        "parameters": [{ "in": "header", "name": "Idempotency-Key", "required": true, "schema": { "type": "string" } }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["attemptId", "mimeType", "contentBase64", "revision"],
+                "properties": {
+                  "attemptId": { "type": "string", "format": "uuid" },
+                  "mimeType": { "type": "string", "enum": ["application/pdf", "image/png", "image/jpeg", "text/plain"] },
+                  "contentBase64": { "type": "string" },
+                  "revision": { "type": "integer", "minimum": 0 }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": { "description": "Scanner accepted and released the attachment" },
+          "202": { "description": "Quarantined while scanner unavailable, or rejected after a positive scan" },
+          "503": { "$ref": "#/components/responses/Error" }
+        }
+      }
+    },
+    "/mini-app/export-requests": { "post": { "summary": "Request an export", "responses": { "202": { "description": "Export request accepted" } } } },
+    "/mini-app/export-requests/{requestId}/download": {
+      "get": {
+        "summary": "Download a ready, unexpired export",
+        "parameters": [{ "in": "path", "name": "requestId", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+        "responses": { "200": { "description": "Export file" }, "404": { "$ref": "#/components/responses/Error" } }
+      }
+    },
+    "/mini-app/deletion-requests": { "post": { "summary": "Create a two-step deletion request pending retention policy", "responses": { "202": { "description": "Deletion request pending policy" } } } },
+    "/mini-app/notification-preferences": { "put": { "summary": "Update shared notification settings", "responses": { "200": { "description": "Preferences saved" } } } }
+  },
+  "components": {
+    "schemas": {
+      "DiagnosticAction": {
+        "type": "object",
+        "required": ["action", "revision"],
+        "properties": {
+          "action": { "type": "string", "enum": ["answer", "skip", "unknown", "pause", "resume", "finish", "more"] },
+          "revision": { "type": "integer", "minimum": 0 },
+          "questionInstanceId": { "type": "string", "format": "uuid" },
+          "sessionRevision": { "type": "integer", "minimum": 0 },
+          "answer": { "type": "string" }
+        }
+      },
+      "DiagnosticQuestion": {
+        "type": "object",
+        "required": ["session_id", "session_revision", "public_question"],
+        "properties": {
+          "session_id": { "type": "string", "format": "uuid" },
+          "question_instance_id": { "type": "string", "format": "uuid", "nullable": true },
+          "session_revision": { "type": "integer", "minimum": 0 },
+          "public_question": { "type": "object", "nullable": true, "additionalProperties": true }
+        }
+      }
+    },
+    "responses": {
+      "DiagnosticQuestion": { "description": "Canonical question and session revision", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/DiagnosticQuestion" } } } },
+      "Error": { "description": "Structured application error", "content": { "application/json": { "schema": { "type": "object", "additionalProperties": true } } } }
+    }
+  }
+}

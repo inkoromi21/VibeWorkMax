@@ -58,6 +58,29 @@ export class BudgetedTemplateAiOperations {
     private readonly ledger: PostgresAiUsageLedger,
   ) {}
 
+  canAdmit(input: {
+    templateId: PromptTemplateId;
+    approvedContext: Record<string, unknown>;
+    userInput: unknown;
+    modelPolicy: ModelPolicy;
+    deadlineMs?: number;
+    maxInputTokens?: number;
+    maxOutputTokens?: number;
+  }): Promise<boolean> {
+    return this.ledger.canAfford({
+      provider: this.providerName,
+      request: buildStructuredTemplateRequest({
+        templateId: input.templateId,
+        approvedContext: input.approvedContext,
+        userInput: input.userInput,
+        deadlineMs: input.deadlineMs ?? 10_000,
+        maxInputTokens: input.maxInputTokens ?? 4_000,
+        maxOutputTokens: input.maxOutputTokens ?? 600,
+        modelPolicy: input.modelPolicy,
+      }),
+    });
+  }
+
   async execute(input: {
     templateId: PromptTemplateId;
     approvedContext: Record<string, unknown>;
@@ -81,7 +104,10 @@ export class BudgetedTemplateAiOperations {
     });
     type RunResult =
       | { kind: 'VALUE'; value: Record<string, unknown>; model: string }
-      | { kind: 'DENIED' | 'EXISTING' | 'INVALID' | 'PROVIDER_UNAVAILABLE' };
+      | {
+          kind: 'DENIED' | 'EXISTING' | 'INVALID' | 'PROVIDER_UNAVAILABLE';
+          entryId: string;
+        };
     const run = async (candidate: typeof request, attempt: 0 | 1): Promise<RunResult> => {
       const reservation = await this.ledger.preflight({
         request: candidate,
@@ -94,8 +120,18 @@ export class BudgetedTemplateAiOperations {
           null,
         ) as unknown as Record<string, unknown>,
       });
-      if (reservation.kind === 'DENIED') return { kind: 'DENIED' };
-      if (reservation.kind === 'EXISTING') return { kind: 'EXISTING' };
+      if (reservation.kind === 'DENIED') return { kind: 'DENIED', entryId: reservation.entry.id };
+      if (reservation.kind === 'EXISTING') {
+        if (reservation.entry.status === 'DENIED')
+          return { kind: 'DENIED', entryId: reservation.entry.id };
+        const replay = await this.ledger.replayStructuredResult(reservation.entry.id);
+        if (replay) {
+          const schema = validateStructuredTemplateOutput(input.templateId, replay);
+          if (schema.valid && validateTemplateDomainOutput(schema.value, input.domainContext).valid)
+            return { kind: 'VALUE', value: schema.value, model: reservation.entry.model };
+        }
+        return { kind: 'EXISTING', entryId: reservation.entry.id };
+      }
       try {
         const result = await this.provider.generateStructured<Record<string, unknown>>(candidate);
         await this.ledger.reconcile({
@@ -105,12 +141,32 @@ export class BudgetedTemplateAiOperations {
         });
         const schema = validateStructuredTemplateOutput(input.templateId, result.value);
         if (!schema.valid || !validateTemplateDomainOutput(schema.value, input.domainContext).valid)
-          return { kind: 'INVALID' };
+          return { kind: 'INVALID', entryId: reservation.entry.id };
         return { kind: 'VALUE', value: schema.value, model: result.model };
       } catch {
         await this.ledger.markProviderFailure(reservation.entry.id);
-        return { kind: 'PROVIDER_UNAVAILABLE' };
+        return { kind: 'PROVIDER_UNAVAILABLE', entryId: reservation.entry.id };
       }
+    };
+    const fallback = async (
+      runResult: Exclude<RunResult, { kind: 'VALUE' }>,
+      reason: NonNullable<TemplateOperationResult['fallbackReason']>,
+      repairAttempts: 0 | 1,
+    ): Promise<TemplateOperationResult> => {
+      const provenance = promptProvenance(input.templateId, this.providerName, null);
+      await this.ledger.recordFallback({
+        entryId: runResult.entryId,
+        operation: template.operationKind,
+        reason,
+        provenance: provenance as unknown as Record<string, unknown>,
+      });
+      return {
+        value: template.fallback,
+        usedFallback: true,
+        provenance,
+        repairAttempts,
+        fallbackReason: reason,
+      };
     };
     const first = await run(request, 0);
     if (first.kind === 'VALUE')
@@ -120,22 +176,8 @@ export class BudgetedTemplateAiOperations {
         provenance: promptProvenance(input.templateId, this.providerName, first.model),
         repairAttempts: 0,
       };
-    if (first.kind === 'DENIED')
-      return {
-        value: template.fallback,
-        usedFallback: true,
-        provenance: promptProvenance(input.templateId, this.providerName, null),
-        repairAttempts: 0,
-        fallbackReason: 'BUDGET_EXCEEDED',
-      };
-    if (first.kind !== 'INVALID')
-      return {
-        value: template.fallback,
-        usedFallback: true,
-        provenance: promptProvenance(input.templateId, this.providerName, null),
-        repairAttempts: 0,
-        fallbackReason: 'PROVIDER_UNAVAILABLE',
-      };
+    if (first.kind === 'DENIED') return fallback(first, 'BUDGET_EXCEEDED', 0);
+    if (first.kind !== 'INVALID') return fallback(first, 'PROVIDER_UNAVAILABLE', 0);
     const repair = await run(buildRepairRequest(request, { invalid: true }), 1);
     if (repair.kind === 'VALUE')
       return {
@@ -145,17 +187,14 @@ export class BudgetedTemplateAiOperations {
         repairAttempts: 1,
       };
     // No claimed model output is surfaced when a budget or validation path fails.
-    return {
-      value: template.fallback,
-      usedFallback: true,
-      provenance: promptProvenance(input.templateId, this.providerName, null),
-      repairAttempts: 1,
-      fallbackReason:
-        repair.kind === 'DENIED'
-          ? 'BUDGET_EXCEEDED'
-          : repair.kind === 'INVALID'
-            ? 'INVALID_OUTPUT'
-            : 'PROVIDER_UNAVAILABLE',
-    };
+    return fallback(
+      repair,
+      repair.kind === 'DENIED'
+        ? 'BUDGET_EXCEEDED'
+        : repair.kind === 'INVALID'
+          ? 'INVALID_OUTPUT'
+          : 'PROVIDER_UNAVAILABLE',
+      1,
+    );
   }
 }

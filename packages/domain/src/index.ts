@@ -7,3 +7,7 @@ export * from './problem-diagnostic.js';
 export * from './bot.js';
 export * from './ai-usage-ledger.js';
 export * from './ai-operations.js';
+export * from './ai-composition.js';
+export * from './ai-problem-classifier.js';
+export * from './access-policy.js';
+export * from './learning.js';

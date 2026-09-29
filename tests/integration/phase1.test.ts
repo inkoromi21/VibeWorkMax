@@ -2,10 +2,13 @@ import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { JobService } from '../../apps/api/src/jobs.js';
 import { buildServer } from '../../apps/api/src/server.js';
+import { PostgresAttachmentRepository } from '../../apps/api/src/attachments.js';
 import { createJobWorker } from '../../apps/worker/src/jobs.js';
+import { gradeAttempt } from '../../apps/worker/src/max-bot.js';
 import {
   MemoryNotificationTransport,
   PostgresAiUsageLedger,
+  DiagnosticApplicationService,
   PostgresDiagnosticSessionRepository,
   PostgresProblemDiagnosticRepository,
   classifyProblem,
@@ -37,7 +40,12 @@ let poolStarted = false;
 function migrate(command = 'migrate'): void {
   execFileSync('pnpm', [command], {
     cwd: root,
-    env: { ...process.env, CI: 'true', DATABASE_URL: databaseUrl },
+    env: {
+      ...process.env,
+      CI: 'true',
+      DATABASE_URL: databaseUrl,
+      ...(command === 'migrate:down:local-test' ? { MIGRATION_DOWN_LOCAL_TEST: '1' } : {}),
+    },
     stdio: 'pipe',
   });
 }
@@ -116,6 +124,14 @@ describe('PostgreSQL migrations', () => {
       'diagnostic_results',
       'ai_budget_days',
       'ai_usage_ledger',
+      'learning_routes',
+      'learning_positions',
+      'attempts',
+      'review_versions',
+      'disputes',
+      'notification_preferences',
+      'content_catalog_versions',
+      'mini_app_export_requests',
     ])
       expect(names.has(table)).toBe(true);
     const indexes = await pool.query<{ indexname: string }>(
@@ -236,6 +252,62 @@ describe('AI usage ledger', () => {
 });
 
 describe('canonical diagnostic persistence', () => {
+  it('continues after the eighth answer through explicit consent and saves the next question atomically', async () => {
+    const userId = newUuid<UserId>();
+    await pool.query('INSERT INTO users(id) VALUES ($1)', [userId]);
+    const created = await new PostgresProblemDiagnosticRepository(pool).createConfirmedSession({
+      userId,
+      rawText: 'не понимаю дроби',
+      classification: classifyProblem('не понимаю дроби'),
+      profile: { educationTrack: 'student' },
+      traceId: 'trace-diagnostic-consent',
+    });
+    const diagnostics = new DiagnosticApplicationService(pool, demoDiagnosticCatalog);
+    let question = await diagnostics.issueNext({ sessionId: created.sessionId, userId });
+    expect(question.kind).toBe('QUESTION');
+    for (let index = 0; index < 8; index += 1) {
+      if (question.kind !== 'QUESTION') throw new Error('Question was not issued');
+      const progress = await diagnostics.answerAndIssue({
+        sessionId: created.sessionId,
+        userId,
+        questionInstanceId: question.questionInstanceId,
+        expectedRevision: question.sessionRevision,
+        idempotencyKey: `answer-${String(index)}`,
+        kind: 'TEXT',
+        value: `answer-${String(index)}`,
+      });
+      if (index === 7) {
+        expect(progress.stoppedReason).toBe('ADDITIONAL_CONSENT_REQUIRED');
+        expect(progress.questionInstanceId).toBeNull();
+      } else {
+        if (!progress.questionInstanceId || !progress.publicQuestion)
+          throw new Error('Next diagnostic question was not issued');
+        question = {
+          kind: 'QUESTION',
+          questionInstanceId: progress.questionInstanceId,
+          sessionRevision: progress.sessionRevision,
+          publicQuestion: progress.publicQuestion,
+        };
+      }
+    }
+    const ninth = await diagnostics.grantAdditionalConsentAndIssue({
+      sessionId: created.sessionId,
+      userId,
+    });
+    expect(ninth.questionInstanceId).toBeTruthy();
+    const persisted = await pool.query<{ question_count: number; additional_consent_at: Date }>(
+      'SELECT question_count,additional_consent_at FROM diagnostic_sessions WHERE id=$1',
+      [created.sessionId],
+    );
+    expect(persisted.rows[0]?.question_count).toBe(8);
+    expect(persisted.rows[0]?.additional_consent_at).toBeTruthy();
+    const outstanding = await pool.query<{ id: string }>(
+      'SELECT id FROM diagnostic_question_instances WHERE id=$1',
+      [ninth.questionInstanceId],
+    );
+    expect(outstanding.rows[0]?.id).toBe(ninth.questionInstanceId);
+  });
+
   it('persists provenance without raw text and enforces ownership, consent, and hard limits', async () => {
     const userId = newUuid<UserId>();
     const otherUserId = newUuid<UserId>();
@@ -372,6 +444,63 @@ describe('canonical diagnostic persistence', () => {
       [finished.resultId],
     );
     expect(originalResult.rows[0]?.payload.status).toBe('COMPLETED_PARTIAL');
+  });
+});
+
+describe('immutable attempt reviews', () => {
+  it('publishes a new ready version atomically and does not duplicate it on retry', async () => {
+    const userId = newUuid<UserId>();
+    const attemptId = newUuid();
+    const pendingReviewId = newUuid();
+    await pool.query('INSERT INTO users(id) VALUES ($1)', [userId]);
+    await pool.query(
+      `INSERT INTO attempts(id,user_id,task_version_id,rubric_version,assistance_level,
+       independent_pass_eligible,answer_payload,idempotency_key)
+       VALUES ($1,$2,$3,$4,'NONE',true,$5,$6)`,
+      [
+        attemptId,
+        userId,
+        '00000000-0000-4000-8000-000000000203',
+        '00000000-0000-4000-8000-000000000204',
+        { text: 'Сначала выделю условие задачи.' },
+        'integration-review',
+      ],
+    );
+    await pool.query(
+      `INSERT INTO review_versions(id,attempt_id,version,rubric_version,status,payload)
+       VALUES ($1,$2,1,$3,'PENDING',$4)`,
+      [
+        pendingReviewId,
+        attemptId,
+        '00000000-0000-4000-8000-000000000204',
+        { reason: 'REVIEW_QUEUED' },
+      ],
+    );
+    await gradeAttempt(pool, `attempt:${attemptId}`);
+    await gradeAttempt(pool, `attempt:${attemptId}`);
+    const reviews = await pool.query<{
+      id: string;
+      version: number;
+      status: string;
+      payload: { criterionResults?: { criterionId: string; status: string }[] };
+    }>(
+      'SELECT id,version,status,payload FROM review_versions WHERE attempt_id=$1 ORDER BY version',
+      [attemptId],
+    );
+    expect(reviews.rows).toHaveLength(2);
+    expect(reviews.rows[0]).toMatchObject({
+      id: pendingReviewId,
+      version: 1,
+      status: 'PENDING',
+      payload: { reason: 'REVIEW_QUEUED' },
+    });
+    expect(reviews.rows[1]).toMatchObject({
+      version: 2,
+      status: 'READY',
+      payload: {
+        criterionResults: [{ criterionId: 'response-present', status: 'OBSERVED' }],
+      },
+    });
   });
 });
 
@@ -520,5 +649,46 @@ describe('transactional outbox and audit', () => {
     );
     expect(domain.rowCount).toBe(1);
     expect(outbox.rows[0]).toMatchObject({ status: 'FAILED', last_error_code: 'DELIVERY_FAILED' });
+  });
+});
+
+describe('attachment ownership and idempotency', () => {
+  it('reserves one quarantined file per key and never links another user attempt', async () => {
+    const owner = newUuid<UserId>();
+    const stranger = newUuid<UserId>();
+    const attemptId = newUuid();
+    await pool.query('INSERT INTO users(id) VALUES ($1),($2)', [owner, stranger]);
+    await pool.query(
+      `INSERT INTO attempts(id,user_id,task_version_id,rubric_version,assistance_level,independent_pass_eligible,answer_payload,idempotency_key)
+       VALUES ($1,$2,'demo-task-v1','demo-rubric-v1','NONE',true,'{}','attempt-attachment-test')`,
+      [attemptId, owner],
+    );
+    const repo = new PostgresAttachmentRepository(pool);
+    const upload = {
+      id: newUuid(),
+      userId: owner,
+      attemptId,
+      objectKey: `quarantine/${newUuid()}`,
+      byteSize: 4,
+      sha256: 'a'.repeat(64),
+      mimeType: 'text/plain',
+      idempotencyKey: 'file-1',
+    };
+    expect(await repo.reserve(upload)).toMatchObject({ inserted: true, status: 'QUARANTINED' });
+    expect(await repo.reserve({ ...upload, id: newUuid() })).toMatchObject({
+      id: upload.id,
+      inserted: false,
+    });
+    await expect(
+      repo.reserve({ ...upload, id: newUuid(), sha256: 'b'.repeat(64) }),
+    ).rejects.toThrow('Ключ запроса');
+    await expect(repo.reserve({ ...upload, id: newUuid(), userId: stranger })).rejects.toThrow(
+      'Попытка не найдена',
+    );
+    const stored = await pool.query<{ status: string; user_id: string }>(
+      'SELECT status,user_id FROM mini_app_attachments WHERE id=$1',
+      [upload.id],
+    );
+    expect(stored.rows[0]).toMatchObject({ status: 'QUARANTINED', user_id: owner });
   });
 });

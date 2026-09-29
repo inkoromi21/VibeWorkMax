@@ -151,9 +151,16 @@ export class YandexAiStudioProvider implements AiProvider {
           usage: normalizeUsage(value.usage),
           cost: unknownCost(),
           providerRequestId: response.headers.get('x-request-id'),
-          model: typeof value.model === 'string' ? value.model : model,
+          // AI Studio may report a generic `gpt://<folder>/latest` alias for
+          // multiple requested models. Tariff accounting must use the URI that
+          // was actually sent; retain the provider value separately for audit.
+          model,
           latencyMs: Date.now() - started,
-          metadata: { provider: 'yandex-ai-studio', operationKind: request.operationKind },
+          metadata: {
+            provider: 'yandex-ai-studio',
+            operationKind: request.operationKind,
+            providerReportedModel: typeof value.model === 'string' ? value.model : null,
+          },
         },
       };
     } catch (error) {

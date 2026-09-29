@@ -28,6 +28,8 @@ export interface MaxUpdate {
   callback?: { callback_id?: string; payload?: string; user?: { user_id?: string | number } };
 }
 
+export type MaxProviderEventIdField = 'event_id' | 'update_id' | 'event_specific';
+
 export interface StoredMaxUpdate {
   eventId: string;
   /** True only when MAX supplied a durable ID rather than a local fingerprint. */
@@ -85,6 +87,7 @@ export function assertMaxWebhookConfiguration(input: {
   secret?: string;
   token?: string;
   identityEncryptionKey?: string;
+  providerEventIdField?: string;
 }): void {
   if (!input.token || !input.secret || !/^[A-Za-z0-9_-]{5,256}$/.test(input.secret)) {
     throw new ApplicationError({
@@ -119,6 +122,16 @@ export function assertMaxWebhookConfiguration(input: {
       statusCode: 503,
     });
   }
+  if (
+    input.providerEventIdField !== 'event_id' &&
+    input.providerEventIdField !== 'update_id' &&
+    input.providerEventIdField !== 'event_specific'
+  )
+    throw new ApplicationError({
+      code: 'MAX_PROVIDER_EVENT_ID_UNCONFIRMED',
+      message: 'Поле идентификатора события MAX не подтверждено',
+      statusCode: 503,
+    });
 }
 
 function digestActor(value: string): string {
@@ -160,7 +173,11 @@ export function verifyMaxWebhookSecret(
   );
 }
 
-export function parseMaxUpdate(value: unknown, identityEncryptionKey?: string): StoredMaxUpdate {
+export function parseMaxUpdate(
+  value: unknown,
+  identityEncryptionKey?: string,
+  providerEventIdField?: MaxProviderEventIdField,
+): StoredMaxUpdate {
   if (!value || typeof value !== 'object' || Array.isArray(value)) {
     throw new ApplicationError({
       code: 'INVALID_MAX_UPDATE',
@@ -171,12 +188,27 @@ export function parseMaxUpdate(value: unknown, identityEncryptionKey?: string): 
   const source = value as MaxUpdate;
   const type = stringField(source.update_type) ?? stringField(source.type);
   const actor = actorId(source);
-  const providerId =
-    stringField(source.event_id) ??
-    (source.update_id === undefined ? undefined : String(source.update_id));
+  const eventSpecificCallbackId =
+    stringField(source.callback?.callback_id) ?? stringField(source.callback_id);
+  const providerId = providerEventIdField
+    ? providerEventIdField === 'event_id'
+      ? stringField(source.event_id)
+      : providerEventIdField === 'update_id'
+        ? source.update_id === undefined
+          ? undefined
+          : String(source.update_id)
+        : type === 'message_created' && messageId(source) !== undefined
+          ? `message:${String(messageId(source))}`
+          : type === 'message_callback' && eventSpecificCallbackId
+            ? `callback:${eventSpecificCallbackId}`
+            : undefined
+    : (stringField(source.event_id) ??
+      (source.update_id === undefined ? undefined : String(source.update_id)));
   // MAX sends message text and its durable mid inside message.body.
   const text =
-    stringField(source.text) ?? stringField(source.message?.body?.text) ?? stringField(source.message?.text);
+    stringField(source.text) ??
+    stringField(source.message?.body?.text) ??
+    stringField(source.message?.text);
   const callback = stringField(source.payload) ?? stringField(source.callback?.payload);
   const callbackId = stringField(source.callback_id) ?? stringField(source.callback?.callback_id);
   if (

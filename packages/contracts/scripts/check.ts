@@ -32,6 +32,11 @@ if (Object.keys(schema.$defs).length !== 21) throw new Error('expected 21 schema
 
 const api = (await SwaggerParser.validate(`${sourceRoot}/openapi-core.json`)) as { paths?: object };
 if (Object.keys(api.paths ?? {}).length !== 17) throw new Error('expected 17 OpenAPI paths');
+const miniAppApi = (await SwaggerParser.validate(`${sourceRoot}/openapi-mini-app.json`)) as {
+  paths?: object;
+};
+if (Object.keys(miniAppApi.paths ?? {}).length !== 18)
+  throw new Error('expected 18 mini-app OpenAPI paths');
 
 const committed = await readFile(new URL('../src/generated/contracts.ts', import.meta.url), 'utf8');
 if (committed !== (await generatedContracts())) throw new Error('generated contracts are stale');

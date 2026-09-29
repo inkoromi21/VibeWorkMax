@@ -11,6 +11,7 @@
     "start": "node dist/index.js"
   },
   "dependencies": {
+    "@vibework/ai": "workspace:*",
     "@vibework/domain": "workspace:*",
     "@vibework/shared": "workspace:*",
     "bullmq": "^5.58.5",

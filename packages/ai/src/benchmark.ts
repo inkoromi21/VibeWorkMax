@@ -4,10 +4,13 @@ import {
   validateStructuredTemplateOutput,
   type PromptTemplateId,
 } from './prompts.js';
+import { actualAiCost, estimateInputTokens, type AiPricingCatalog } from './pricing.js';
 import type { AiProvider, AiResult, ModelPolicy, Usage } from './port.js';
 
 export const BENCHMARK_RESULT_VERSION = 'v1' as const;
 export const BENCHMARK_PROVIDER = 'yandex-ai-studio' as const;
+export const BENCHMARK_MAX_INPUT_TOKENS = 600;
+export const BENCHMARK_MAX_OUTPUT_TOKENS = 200;
 
 export type BenchmarkModelId = 'alice-ai-llm-flash' | 'alice-ai-llm' | 'yandexgpt-pro-5.1';
 export type BenchmarkRunStatus = 'COMPLETED' | 'BLOCKED_EXTERNAL_INPUT';
@@ -73,6 +76,7 @@ export interface BenchmarkInvocation {
   usage: Usage | null;
   cost: { amount: number | null; currency: string | null } | null;
   providerRequestId: string | null;
+  output: Record<string, unknown> | null;
   error: string | null;
 }
 
@@ -112,6 +116,8 @@ export interface BenchmarkResult {
   };
   actualAiSpend: { amount: number | null; currency: string | null };
   blockedReasons: readonly string[];
+  pricingVersion?: string;
+  costReconciliation?: 'RECORDED_USAGE_REQUESTED_MODEL';
 }
 
 function validRate(values: readonly (boolean | null)[]): number | null {
@@ -194,6 +200,7 @@ function invocationFromResult(
     usage: result.usage,
     cost: result.cost,
     providerRequestId: result.providerRequestId,
+    output: result.value,
     error: null,
   };
 }
@@ -222,6 +229,7 @@ function failedInvocation(input: {
     usage: null,
     cost: null,
     providerRequestId: null,
+    output: null,
     error: input.error instanceof Error ? input.error.message : 'Unknown benchmark provider error',
   };
 }
@@ -257,6 +265,10 @@ function aggregate(input: {
     rejectedReasons.push('SOURCE_FIDELITY_THRESHOLD');
   if (medianMs === null || medianMs > input.thresholds.maxMedianLatencyMs)
     rejectedReasons.push('LATENCY_THRESHOLD');
+  if (input.invocations.some((row) => row.rubricAgreement === 'NOT_MEASURABLE'))
+    rejectedReasons.push('RUBRIC_AGREEMENT_NOT_MEASURABLE');
+  if (input.invocations.some((row) => row.quality === 'NOT_MEASURABLE'))
+    rejectedReasons.push('QUALITY_NOT_MEASURABLE');
   if (input.invocations.some((row) => row.status === 'FAILED'))
     rejectedReasons.push('PROVIDER_FAILURE');
   return {
@@ -304,6 +316,23 @@ export async function runBenchmark(input: {
     throw new Error('Benchmark runCount must be positive');
   if (input.dataset.promptTemplateVersion !== 'v1')
     throw new Error('Dataset prompt template version does not match installed templates');
+  for (const benchmarkCase of input.dataset.cases) {
+    const template = promptTemplates[benchmarkCase.templateId];
+    const request = buildStructuredTemplateRequest({
+      templateId: benchmarkCase.templateId,
+      approvedContext: benchmarkCase.approvedContext,
+      userInput: benchmarkCase.userInput,
+      deadlineMs: 10_000,
+      maxInputTokens: BENCHMARK_MAX_INPUT_TOKENS,
+      maxOutputTokens: BENCHMARK_MAX_OUTPUT_TOKENS,
+      modelPolicy: { allowedModels: ['preflight'] },
+    });
+    if (
+      estimateInputTokens(request.prompt + JSON.stringify(template.schema)) >
+      BENCHMARK_MAX_INPUT_TOKENS
+    )
+      throw new Error(`Benchmark case ${benchmarkCase.id} exceeds input token reservation`);
+  }
   const thresholds = input.thresholds ?? DEFAULT_BENCHMARK_THRESHOLDS;
   const invocations: BenchmarkInvocation[] = [];
   for (const model of input.models) {
@@ -316,8 +345,8 @@ export async function runBenchmark(input: {
           approvedContext: benchmarkCase.approvedContext,
           userInput: benchmarkCase.userInput,
           deadlineMs: 10_000,
-          maxInputTokens: 4_000,
-          maxOutputTokens: 600,
+          maxInputTokens: BENCHMARK_MAX_INPUT_TOKENS,
+          maxOutputTokens: BENCHMARK_MAX_OUTPUT_TOKENS,
           modelPolicy: {
             allowedModels: [model.modelUri ?? 'unavailable'],
             preferredModel: model.modelUri ?? 'unavailable',
@@ -417,5 +446,42 @@ export function blockedBenchmark(input: {
     modelPolicy: { status: 'NOT_SELECTED', byOperationKind: {} },
     actualAiSpend: { amount: null, currency: null },
     blockedReasons: input.blockedReasons,
+  };
+}
+
+/** Repair older reports when AI Studio returned a generic model alias. */
+export function repriceBenchmarkFromRecordedUsage(
+  result: BenchmarkResult,
+  pricing: AiPricingCatalog,
+): BenchmarkResult {
+  if (result.status !== 'COMPLETED' || result.provider !== BENCHMARK_PROVIDER)
+    throw new Error('Only completed Yandex benchmark reports can be repriced');
+  const invocations = result.invocations.map((row) => {
+    if (row.status === 'FAILED') return row;
+    if (!row.model.modelUri || !row.usage)
+      throw new Error(`Missing requested model or usage for ${row.caseId}`);
+    const cost = actualAiCost(pricing, result.provider, row.model.modelUri, row.usage);
+    if (!cost) throw new Error(`Missing tariff or token usage for ${row.caseId}`);
+    return { ...row, cost: { amount: cost.totalCost, currency: cost.currency } };
+  });
+  const aggregates = result.aggregates.map((row) =>
+    aggregate({
+      model: row.model,
+      operationKind: row.operationKind,
+      invocations: invocations.filter(
+        (invocation) =>
+          invocation.model.id === row.model.id && invocation.operationKind === row.operationKind,
+      ),
+      thresholds: result.thresholds,
+    }),
+  );
+  const amount = invocations.reduce((sum, row) => sum + (row.cost?.amount ?? 0), 0);
+  return {
+    ...result,
+    invocations,
+    aggregates,
+    actualAiSpend: { amount, currency: pricing.currency },
+    pricingVersion: pricing.version,
+    costReconciliation: 'RECORDED_USAGE_REQUESTED_MODEL',
   };
 }

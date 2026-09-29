@@ -18,6 +18,12 @@ const pricing: AiPricingCatalog = {
 };
 
 const valid: Record<PromptTemplateId, Record<string, unknown>> = {
+  classification: {
+    type: 'KNOWLEDGE_GAP',
+    confidence: 0.9,
+    reason: 'The user describes a knowledge gap',
+    clarification_needed: false,
+  },
   clarification: { clarification: 'Что именно хотите изучить?' },
   'question-variant': { question: 'Выберите вариант', optionIds: [] },
   explanation: { explanation: 'Короткое объяснение', referenceIds: [], urls: [] },

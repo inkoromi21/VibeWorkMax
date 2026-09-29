@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { validateContract } from '@vibework/contracts';
 import {
   ApplicationError,
@@ -15,6 +16,12 @@ import { Redis } from 'ioredis';
 import { Pool } from 'pg';
 import { JobService } from './jobs.js';
 import {
+  AttachmentService,
+  ClamAvScanner,
+  LocalAttachmentStorage,
+  PostgresAttachmentRepository,
+} from './attachments.js';
+import {
   MemoryMaxWebhookStore,
   NoopMaxWebhookMetrics,
   assertMaxWebhookConfiguration,
@@ -30,6 +37,12 @@ import {
   registerMiniAppRoutes,
   type MiniAppStore,
 } from './mini-app.js';
+import {
+  consentPolicyFromEnvironment,
+  createBudgetedAiOperations,
+  TemplateAiProblemClassifier,
+  type AiProblemClassifier,
+} from '@vibework/domain';
 
 declare module 'fastify' {
   interface FastifyRequest {
@@ -48,6 +61,12 @@ export interface ServerOptions {
   };
   webhookMetrics?: MaxWebhookMetrics;
   miniAppStore?: MiniAppStore;
+  attachmentService?: AttachmentService;
+  problemClassifierFactory?: (
+    userId: string,
+    revision: number,
+    text: string,
+  ) => AiProblemClassifier;
   /** Production registration is blocked until MAX confirms an Update event ID. */
   requireMaxProviderEventId?: boolean;
 }
@@ -80,6 +99,8 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
 
   let jobs: JobService | undefined;
   let miniAppStore = options.miniAppStore ?? new MemoryMiniAppStore();
+  let problemClassifierFactory = options.problemClassifierFactory;
+  let attachmentService = options.attachmentService;
   let webhookStore = options.webhookStore;
   if (options.registerJobs ?? true) {
     const redis = new Redis(options.redisUrl ?? process.env.REDIS_URL ?? 'redis://127.0.0.1:6379', {
@@ -89,7 +110,28 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
     const jobService = new JobService(redis);
     jobs = jobService;
     const pool = new Pool({ connectionString: options.databaseUrl ?? process.env.DATABASE_URL });
-    if (!options.miniAppStore) miniAppStore = new PostgresMiniAppStore(pool);
+    if (!options.miniAppStore) {
+      miniAppStore = new PostgresMiniAppStore(pool, consentPolicyFromEnvironment());
+      if (process.env.S3_MODE === 'local' && process.env.ATTACHMENT_LOCAL_DIR) {
+        attachmentService = new AttachmentService(
+          new PostgresAttachmentRepository(pool),
+          new LocalAttachmentStorage(process.env.ATTACHMENT_LOCAL_DIR),
+          new ClamAvScanner(
+            process.env.CLAMAV_HOST ?? '',
+            Number(process.env.CLAMAV_PORT ?? 3310),
+            process.env.CLAMAV_MODE === 'enabled',
+          ),
+        );
+      }
+      const ai = createBudgetedAiOperations(pool);
+      if (ai.enabled)
+        problemClassifierFactory ??= (userId, revision, text) =>
+          new TemplateAiProblemClassifier(
+            ai.operations,
+            ai.modelPolicy,
+            `problem-classification:${userId}:${String(revision)}:${createHash('sha256').update(text).digest('hex')}`,
+          );
+    }
     webhookStore ??= new PostgresMaxWebhookStore(pool);
     app.addHook('onClose', async () => {
       await jobs?.close();
@@ -128,6 +170,8 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
   webhookStore ??= new MemoryMaxWebhookStore();
   void app.register(registerMiniAppRoutes, {
     store: miniAppStore,
+    ...(problemClassifierFactory === undefined ? {} : { problemClassifierFactory }),
+    ...(attachmentService === undefined ? {} : { attachmentService }),
     ...(process.env.MAX_BOT_TOKEN === undefined ? {} : { botToken: process.env.MAX_BOT_TOKEN }),
     allowDevAuth:
       process.env.MINI_APP_DEV_AUTH === 'enabled' && process.env.NODE_ENV !== 'production',
@@ -148,6 +192,9 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
         ...(process.env.MAX_IDENTITY_ENCRYPTION_KEY === undefined
           ? {}
           : { identityEncryptionKey: process.env.MAX_IDENTITY_ENCRYPTION_KEY }),
+        ...(process.env.MAX_PROVIDER_EVENT_ID_FIELD === undefined
+          ? {}
+          : { providerEventIdField: process.env.MAX_PROVIDER_EVENT_ID_FIELD }),
       });
     }
     if (
@@ -174,11 +221,13 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
     const update = parseMaxUpdate(
       request.body,
       process.env.MAX_MODE === 'enabled' ? process.env.MAX_IDENTITY_ENCRYPTION_KEY : undefined,
+      process.env.MAX_MODE === 'enabled'
+        ? (process.env.MAX_PROVIDER_EVENT_ID_FIELD as 'event_id' | 'update_id' | 'event_specific')
+        : undefined,
     );
-    // MAX's documented Update schema has no top-level delivery/event id.  The
-    // webhook parser derives a deterministic id from timestamp, chat, actor and
-    // message/callback identity so redeliveries remain idempotent.
-    const requireProviderEventId = options.requireMaxProviderEventId ?? false;
+    // Heuristic fingerprints are permitted only outside enabled provider mode.
+    const requireProviderEventId =
+      options.requireMaxProviderEventId ?? process.env.MAX_MODE === 'enabled';
     if (requireProviderEventId && !update.hasProviderEventId) {
       metrics.increment('rejected');
       throw new ApplicationError({

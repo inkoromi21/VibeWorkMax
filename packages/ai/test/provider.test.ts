@@ -78,9 +78,10 @@ describe('YandexAiStudioProvider contract', () => {
     expect(captured?.init.body).not.toContain('test-key');
     expect(result).toMatchObject({
       value: 'done',
-      model: 'actual-model',
+      model: 'gpt://folder/alice-flash/latest',
       providerRequestId: 'provider-id',
       usage: { totalTokens: 5 },
+      metadata: { providerReportedModel: 'actual-model' },
     });
   });
 

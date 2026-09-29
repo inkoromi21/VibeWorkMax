@@ -1,0 +1,64 @@
+name: quality-gates
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: quality-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.19.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm format:check
+      - run: pnpm lint
+      - run: pnpm typecheck
+      - run: pnpm contracts:check
+      - run: pnpm check:phase0
+      - run: pnpm check:deps
+      - run: pnpm test
+      - run: pnpm build
+      - run: pnpm exec playwright install --with-deps chromium
+      - run: pnpm test:e2e
+      - name: PostgreSQL, Redis, migration, queue and ledger integration
+        run: pnpm test:integration
+
+  container-build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Record production image build time
+        run: |
+          start=$(date +%s)
+          docker build --target proxy -t vibework-max-proxy:ci .
+          end=$(date +%s)
+          echo "production_build_seconds=$((end-start))" | tee production-build-time.txt
+      - name: Reverse proxy session and bootstrap smoke
+        env:
+          MAX_BOT_TOKEN: ci-proxy-smoke-token
+        run: |
+          docker compose --profile lightweight up -d --build --wait
+          node scripts/proxy-smoke.mjs
+      - name: Stop smoke environment
+        if: always()
+        run: docker compose --profile lightweight down --volumes
+      - uses: actions/upload-artifact@v4
+        with:
+          name: production-build-time
+          path: production-build-time.txt

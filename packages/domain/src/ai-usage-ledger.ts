@@ -103,6 +103,31 @@ export class PostgresAiUsageLedger {
     private readonly policy: AiBudgetPolicy,
   ) {}
 
+  /** Best-effort queue admission; `preflight` remains the authoritative atomic reservation. */
+  async canAfford(input: { request: AiRequest; provider: string; now?: Date }): Promise<boolean> {
+    if (
+      this.policy.mode === 'disabled' ||
+      !this.pricing ||
+      !this.policy.maxOperationCost ||
+      !this.policy.dailyAiBudget ||
+      estimateInputTokens(input.request.prompt) > input.request.maxInputTokens
+    )
+      return false;
+    const estimate = estimateWorstCaseCost(this.pricing, input.provider, input.request);
+    if (!estimate || estimate.totalCost > this.policy.maxOperationCost) return false;
+    const day = dayUtc(input.now ?? new Date());
+    const current = await this.pool.query<{ reserved_cost: string; charged_cost: string }>(
+      `SELECT reserved_cost,charged_cost FROM ai_budget_days
+       WHERE operation_day=$1 AND currency=$2`,
+      [day, estimate.currency],
+    );
+    const totals = current.rows[0];
+    return (
+      Number(totals?.reserved_cost ?? 0) + Number(totals?.charged_cost ?? 0) + estimate.totalCost <=
+      this.policy.dailyAiBudget
+    );
+  }
+
   async preflight(input: {
     request: AiRequest;
     provider: string;
@@ -291,7 +316,8 @@ export class PostgresAiUsageLedger {
       );
       const status: AiLedgerStatus = actual ? 'SUCCEEDED' : 'SUCCEEDED_USAGE_UNKNOWN';
       await client.query(
-        `UPDATE ai_usage_ledger SET provider=$2,model=$3,status=$4,input_tokens=$5,output_tokens=$6,actual_input_cost=$7,actual_output_cost=$8,actual_cost=$9,provider_request_id=$10,completed_at=now(),updated_at=now()
+        `UPDATE ai_usage_ledger SET provider=$2,model=$3,status=$4,input_tokens=$5,output_tokens=$6,actual_input_cost=$7,actual_output_cost=$8,actual_cost=$9,provider_request_id=$10,
+           metadata=metadata || jsonb_build_object('structured_result',$11::jsonb),completed_at=now(),updated_at=now()
          WHERE id=$1`,
         [
           input.entryId,
@@ -304,6 +330,7 @@ export class PostgresAiUsageLedger {
           actual?.outputCost ?? null,
           actual?.totalCost ?? null,
           input.result.providerRequestId,
+          JSON.stringify(input.result.value),
         ],
       );
       if (actual && actual.totalCost > Number(entry.estimated_cost))
@@ -339,5 +366,58 @@ export class PostgresAiUsageLedger {
       `UPDATE ai_usage_ledger SET status='FAILED_UNKNOWN',updated_at=now() WHERE id=$1 AND status='RESERVED'`,
       [entryId],
     );
+  }
+
+  async replayStructuredResult(entryId: string): Promise<Record<string, unknown> | null> {
+    const result = await this.pool.query<{ value: unknown }>(
+      `SELECT metadata->'structured_result' AS value FROM ai_usage_ledger
+       WHERE id=$1 AND status IN ('SUCCEEDED','SUCCEEDED_USAGE_UNKNOWN')`,
+      [entryId],
+    );
+    const value = result.rows[0]?.value;
+    return value && typeof value === 'object' && !Array.isArray(value)
+      ? (value as Record<string, unknown>)
+      : null;
+  }
+
+  async recordFallback(input: {
+    entryId: string;
+    operation: string;
+    reason: 'BUDGET_EXCEEDED' | 'INVALID_OUTPUT' | 'PROVIDER_UNAVAILABLE';
+    provenance: Record<string, unknown>;
+  }): Promise<void> {
+    const client = await this.pool.connect();
+    const eventId = newUuid();
+    try {
+      await client.query('BEGIN');
+      await client.query('SELECT pg_advisory_xact_lock(hashtext($1))', [
+        `ai-fallback:${input.entryId}`,
+      ]);
+      const event = await client.query(
+        `INSERT INTO decision_events(event_id,actor_type,action,target_type,target_id,target_version,metadata)
+         SELECT $1,'SYSTEM','AI_FALLBACK','AI_USAGE_LEDGER',$2,1,$3
+         WHERE NOT EXISTS (
+           SELECT 1 FROM decision_events
+           WHERE action='AI_FALLBACK' AND target_type='AI_USAGE_LEDGER' AND target_id=$2
+         ) RETURNING event_id`,
+        [
+          eventId,
+          input.entryId,
+          { operation: input.operation, reason: input.reason, ...input.provenance },
+        ],
+      );
+      if (event.rowCount === 1)
+        await client.query(
+          `INSERT INTO audit_events(id,event_id,actor_type,action,target_type,target_id,target_version,result,metadata)
+           VALUES ($1,$2,'SYSTEM','AI_FALLBACK','AI_USAGE_LEDGER',$3,1,'SUCCEEDED',$4)`,
+          [newUuid(), eventId, input.entryId, { operation: input.operation, reason: input.reason }],
+        );
+      await client.query('COMMIT');
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
   }
 }

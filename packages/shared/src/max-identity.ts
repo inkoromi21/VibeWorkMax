@@ -27,7 +27,12 @@ export function encryptMaxRecipient(value: string, keyValue: string): string {
   const iv = randomBytes(IV_BYTES);
   const cipher = createCipheriv('aes-256-gcm', encryptionKey(keyValue), iv);
   const ciphertext = Buffer.concat([cipher.update(value, 'utf8'), cipher.final()]);
-  return [VERSION, iv.toString('base64url'), ciphertext.toString('base64url'), cipher.getAuthTag().toString('base64url')].join('.');
+  return [
+    VERSION,
+    iv.toString('base64url'),
+    ciphertext.toString('base64url'),
+    cipher.getAuthTag().toString('base64url'),
+  ].join('.');
 }
 
 /** Decrypts only immediately before making a provider request. */

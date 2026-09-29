@@ -1,3 +1,7 @@
+import { randomUUID } from 'node:crypto';
+import { Ajv, type ValidateFunction } from 'ajv';
+import type { Pool } from 'pg';
+
 /**
  * A deliberately small, versioned demo catalog.  It is not a claim of
  * expert validation: the approval is limited to allowing this fixture in the
@@ -35,6 +39,257 @@ export interface DiagnosticCatalog {
   version: string;
   dataMode: 'DEMO_SYNTHETIC';
   templates: readonly QuestionTemplateVersion[];
+}
+
+export const CATALOG_RECORD_KINDS = [
+  'COMPETENCY',
+  'LEARNING_BLOCK',
+  'TASK_TEMPLATE',
+  'RUBRIC',
+  'SOURCE_RECORD',
+  'METHOD_VERSION',
+] as const;
+export type CatalogRecordKind = (typeof CATALOG_RECORD_KINDS)[number];
+
+const nonempty = { type: 'string', minLength: 1 } as const;
+const versionId = { type: 'string', format: 'uuid' } as const;
+const payloadSchemas = {
+  COMPETENCY: {
+    type: 'object',
+    required: ['title'],
+    properties: { title: nonempty },
+    additionalProperties: true,
+  },
+  LEARNING_BLOCK: {
+    type: 'object',
+    required: ['title', 'durationMinutes', 'competencyVersionId'],
+    properties: {
+      title: nonempty,
+      durationMinutes: { type: 'integer', minimum: 1 },
+      competencyVersionId: versionId,
+    },
+    additionalProperties: true,
+  },
+  TASK_TEMPLATE: {
+    type: 'object',
+    required: ['title', 'learningBlockVersionId', 'rubricVersionId'],
+    properties: { title: nonempty, learningBlockVersionId: versionId, rubricVersionId: versionId },
+    additionalProperties: true,
+  },
+  RUBRIC: {
+    type: 'object',
+    required: ['criteria'],
+    properties: {
+      criteria: {
+        type: 'array',
+        minItems: 1,
+        items: {
+          type: 'object',
+          required: ['id', 'description'],
+          properties: { id: nonempty, description: nonempty },
+          additionalProperties: true,
+        },
+      },
+    },
+    additionalProperties: true,
+  },
+  SOURCE_RECORD: {
+    type: 'object',
+    required: ['synthetic'],
+    properties: { synthetic: { type: 'boolean' } },
+    additionalProperties: true,
+  },
+  METHOD_VERSION: {
+    type: 'object',
+    required: ['name'],
+    properties: { name: nonempty },
+    additionalProperties: true,
+  },
+} as const;
+const ajv = new Ajv({ allErrors: true });
+ajv.addFormat('uuid', /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i);
+const payloadValidators = Object.fromEntries(
+  Object.entries(payloadSchemas).map(([kind, schema]) => [kind, ajv.compile(schema)]),
+) as Record<CatalogRecordKind, ValidateFunction>;
+
+export interface CatalogVersionRecord {
+  id: string;
+  kind: CatalogRecordKind;
+  logicalId: string;
+  version: number;
+  status: ContentStatus;
+  dataMode: 'DEMO_SYNTHETIC' | 'VERIFIED_SOURCE';
+  payload: Record<string, unknown>;
+  sourceUrl: string | null;
+  license: string | null;
+  provenance: string;
+  checkedAt: string;
+  expertApproval: ApprovalStatus;
+}
+
+export function validateCatalogRecord(
+  record: Omit<CatalogVersionRecord, 'id' | 'version'>,
+): string[] {
+  const errors: string[] = [];
+  if (!CATALOG_RECORD_KINDS.includes(record.kind)) errors.push('INVALID_KIND');
+  else if (!payloadValidators[record.kind](record.payload)) errors.push('INVALID_PAYLOAD');
+  if (!record.logicalId.trim()) errors.push('MISSING_LOGICAL_ID');
+  if (!record.provenance.trim()) errors.push('MISSING_PROVENANCE');
+  if (!Number.isFinite(Date.parse(record.checkedAt))) errors.push('INVALID_CHECKED_AT');
+  if (record.dataMode === 'VERIFIED_SOURCE' && !record.sourceUrl) errors.push('MISSING_SOURCE_URL');
+  if (record.sourceUrl) {
+    try {
+      const source = new URL(record.sourceUrl);
+      if (source.protocol !== 'https:') errors.push('INVALID_SOURCE_URL');
+    } catch {
+      errors.push('INVALID_SOURCE_URL');
+    }
+  }
+  if (record.dataMode === 'VERIFIED_SOURCE' && !record.license?.trim())
+    errors.push('MISSING_LICENSE');
+  if (record.status === 'PUBLISHED' && record.expertApproval !== 'APPROVED')
+    errors.push('EXPERT_APPROVAL_REQUIRED');
+  return errors;
+}
+
+function collectVersionReferences(value: unknown): {
+  references: { id: string; key: string }[];
+  invalid: boolean;
+} {
+  const isUuid = (candidate: unknown): candidate is string =>
+    typeof candidate === 'string' &&
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(candidate);
+  const references: { id: string; key: string }[] = [];
+  let invalid = false;
+  const visit = (candidate: unknown): void => {
+    if (Array.isArray(candidate)) {
+      for (const item of candidate) visit(item);
+      return;
+    }
+    if (!candidate || typeof candidate !== 'object') return;
+    for (const [key, child] of Object.entries(candidate as Record<string, unknown>)) {
+      if (key.endsWith('VersionId')) {
+        if (isUuid(child)) references.push({ id: child, key });
+        else invalid = true;
+      } else if (key.endsWith('VersionIds')) {
+        if (Array.isArray(child) && child.every(isUuid))
+          for (const item of child) references.push({ id: item, key });
+        else invalid = true;
+      }
+      visit(child);
+    }
+  };
+  visit(value);
+  return { references, invalid };
+}
+
+/** Immutable PostgreSQL catalog versions with explicit publish/archive transitions. */
+export class PostgresContentCatalogRepository {
+  constructor(private readonly pool: Pool) {}
+
+  async import(record: Omit<CatalogVersionRecord, 'id' | 'version' | 'status'>) {
+    const errors = validateCatalogRecord({ ...record, status: 'DRAFT' });
+    if (errors.length) throw new Error(`Invalid catalog record: ${errors.join(',')}`);
+    const id = randomUUID();
+    const client = await this.pool.connect();
+    try {
+      await client.query('BEGIN');
+      await client.query('SELECT pg_advisory_xact_lock(hashtext($1))', [
+        `content:${record.kind}:${record.logicalId}`,
+      ]);
+      const result = await client.query<CatalogVersionRecord>(
+        `INSERT INTO content_catalog_versions(
+        id,kind,logical_id,version,status,data_mode,payload,source_url,license,provenance,checked_at,expert_approval)
+       VALUES ($1,$2,$3,(SELECT COALESCE(MAX(version),0)+1 FROM content_catalog_versions
+         WHERE kind=$2 AND logical_id=$3),'DRAFT',$4,$5,$6,$7,$8,$9,$10)
+       RETURNING id,kind,logical_id AS "logicalId",version,status,data_mode AS "dataMode",payload,
+         source_url AS "sourceUrl",license,provenance,checked_at AS "checkedAt",
+         expert_approval AS "expertApproval"`,
+        [
+          id,
+          record.kind,
+          record.logicalId,
+          record.dataMode,
+          record.payload,
+          record.sourceUrl,
+          record.license,
+          record.provenance,
+          record.checkedAt,
+          record.expertApproval,
+        ],
+      );
+      const imported = result.rows[0];
+      if (!imported) throw new Error('Catalog record was not imported');
+      await client.query('COMMIT');
+      return imported;
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  async validate(id: string): Promise<{ valid: boolean; errors: string[] }> {
+    const record = await this.preview(id);
+    const errors = record ? validateCatalogRecord(record) : ['NOT_FOUND'];
+    if (record) {
+      const references = collectVersionReferences(record.payload);
+      if (references.invalid) errors.push('INVALID_VERSION_REFERENCE');
+      if (references.references.length) {
+        const linked = await this.pool.query<{ id: string; kind: CatalogRecordKind }>(
+          `SELECT id,kind FROM content_catalog_versions WHERE id = ANY($1::uuid[]) AND status='PUBLISHED'`,
+          [references.references.map((reference) => reference.id)],
+        );
+        const published = new Map(linked.rows.map((row) => [row.id, row.kind]));
+        const expectedKinds: Record<string, CatalogRecordKind> = {
+          competencyVersionId: 'COMPETENCY',
+          learningBlockVersionId: 'LEARNING_BLOCK',
+          rubricVersionId: 'RUBRIC',
+          taskTemplateVersionId: 'TASK_TEMPLATE',
+          sourceRecordVersionId: 'SOURCE_RECORD',
+          methodVersionId: 'METHOD_VERSION',
+        };
+        for (const reference of references.references) {
+          const kind = published.get(reference.id);
+          if (!kind) errors.push(`UNPUBLISHED_REFERENCE:${reference.id}`);
+          else if (expectedKinds[reference.key] && expectedKinds[reference.key] !== kind)
+            errors.push(`INVALID_REFERENCE_KIND:${reference.key}`);
+        }
+      }
+    }
+    return { valid: errors.length === 0, errors };
+  }
+
+  async preview(id: string): Promise<CatalogVersionRecord | null> {
+    const result = await this.pool.query<CatalogVersionRecord>(
+      `SELECT id,kind,logical_id AS "logicalId",version,status,data_mode AS "dataMode",payload,
+        source_url AS "sourceUrl",license,provenance,checked_at AS "checkedAt",
+        expert_approval AS "expertApproval" FROM content_catalog_versions WHERE id=$1`,
+      [id],
+    );
+    return result.rows[0] ?? null;
+  }
+
+  async publish(id: string): Promise<void> {
+    const validation = await this.validate(id);
+    if (!validation.valid)
+      throw new Error(`Catalog record is not publishable: ${validation.errors.join(',')}`);
+    const result = await this.pool.query(
+      `UPDATE content_catalog_versions SET status='PUBLISHED',published_at=now()
+       WHERE id=$1 AND status='DRAFT' AND expert_approval='APPROVED'`,
+      [id],
+    );
+    if (result.rowCount !== 1) throw new Error('Only an approved draft can be published');
+  }
+
+  async archive(id: string): Promise<void> {
+    const result = await this.pool.query(
+      "UPDATE content_catalog_versions SET status='ARCHIVED',archived_at=now() WHERE id=$1 AND status='PUBLISHED'",
+      [id],
+    );
+    if (result.rowCount !== 1) throw new Error('Only a published version can be archived');
+  }
 }
 
 const catalogVersion = 'diagnostic-demo-catalog-v1';
@@ -354,4 +609,9 @@ export function selectApprovedDiagnosticTemplates(
     .sort((left, right) => left.priority - right.priority || left.id.localeCompare(right.id));
 }
 
-export const contentInfrastructureReady = true;
+export function contentInfrastructureReady(input: {
+  databaseAvailable: boolean;
+  publishedRecordCount: number;
+}): boolean {
+  return input.databaseAvailable && input.publishedRecordCount > 0;
+}

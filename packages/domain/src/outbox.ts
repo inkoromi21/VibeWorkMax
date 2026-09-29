@@ -137,6 +137,24 @@ export async function dispatchOutboxBatch(
   }
   for (const row of rows) {
     try {
+      const preference = await notificationPreference(pool, row.payload);
+      if (!preference.allowed) {
+        if (preference.reason === 'QUIET_HOURS') {
+          await pool.query(
+            `UPDATE notification_outbox SET status='PENDING',available_at=now()+($2 * interval '1 second'),
+               attempts=GREATEST(attempts-1,0),locked_at=NULL,locked_by=NULL,last_error_code='QUIET_HOURS'
+             WHERE id=$1 AND status='PROCESSING'`,
+            [row.id, preference.deferSeconds],
+          );
+          continue;
+        }
+        await pool.query(
+          `UPDATE notification_outbox SET status='DELIVERED',delivered_at=now(),locked_at=NULL,
+             locked_by=NULL,last_error_code=$2 WHERE id=$1 AND status='PROCESSING'`,
+          [row.id, preference.reason],
+        );
+        continue;
+      }
       await transport.deliver(row.eventId, row.eventType, row.payload);
       await pool.query(
         `UPDATE notification_outbox SET status = 'DELIVERED', delivered_at = now(), locked_at = NULL, locked_by = NULL, last_error_code = NULL WHERE id = $1 AND status = 'PROCESSING'`,
@@ -151,6 +169,48 @@ export async function dispatchOutboxBatch(
     }
   }
   return rows.length;
+}
+
+async function notificationPreference(
+  pool: Pool,
+  payload: Record<string, unknown>,
+  now = new Date(),
+): Promise<
+  | { allowed: true }
+  | { allowed: false; reason: 'PREFERENCE_DISABLED' }
+  | { allowed: false; reason: 'QUIET_HOURS'; deferSeconds: number }
+> {
+  const userId = payload.userId;
+  if (typeof userId !== 'string' || !/^[a-f0-9-]{36}$/i.test(userId)) return { allowed: true };
+  const result = await pool.query<{
+    enabled: boolean;
+    quiet_hours: { start?: string; end?: string; utcOffsetMinutes?: number };
+  }>('SELECT enabled,quiet_hours FROM notification_preferences WHERE user_id=$1', [userId]);
+  const row = result.rows[0];
+  if (!row) return { allowed: true };
+  if (!row.enabled) return { allowed: false, reason: 'PREFERENCE_DISABLED' };
+  const { start, end, utcOffsetMinutes } = row.quiet_hours;
+  if (!start || !end || !Number.isInteger(utcOffsetMinutes)) return { allowed: true };
+  const minutes =
+    (now.getUTCHours() * 60 + now.getUTCMinutes() + (utcOffsetMinutes ?? 0) + 1_440) % 1_440;
+  const parse = (value: string) => {
+    const match = /^(\d{2}):(\d{2})$/.exec(value);
+    if (!match) return null;
+    const hours = Number(match[1]);
+    const minute = Number(match[2]);
+    return hours < 24 && minute < 60 ? hours * 60 + minute : null;
+  };
+  const from = parse(start);
+  const to = parse(end);
+  if (from === null || to === null || from === to) return { allowed: true };
+  const quiet = from < to ? minutes >= from && minutes < to : minutes >= from || minutes < to;
+  return quiet
+    ? {
+        allowed: false,
+        reason: 'QUIET_HOURS',
+        deferSeconds: ((to - minutes + 1_440) % 1_440 || 1_440) * 60,
+      }
+    : { allowed: true };
 }
 
 export class MemoryNotificationTransport implements NotificationTransport {

@@ -77,6 +77,57 @@ describe('mini app session boundary', () => {
     expect(() => verifyMaxInitData(initData({ auth_date: '1' }), token)).toThrow(/Срок/);
   });
 
+  it('uses AI only for an ambiguous authorized request and rejects stale revisions before calling it', async () => {
+    process.env.MAX_BOT_TOKEN = token;
+    let calls = 0;
+    const app = buildServer({
+      registerJobs: false,
+      miniAppStore: new MemoryMiniAppStore(),
+      problemClassifierFactory: () => ({
+        modelIdentifier: 'fake-classifier',
+        classify: () => {
+          calls += 1;
+          return Promise.resolve({
+            type: 'SKILL',
+            confidence: 0.9,
+            reason: 'The request is about learning a skill',
+            clarification_needed: false,
+          });
+        },
+      }),
+    });
+    apps.push(app);
+    const session = await app.inject({
+      method: 'POST',
+      url: '/mini-app/session',
+      payload: { initData: initData() },
+    });
+    const cookie = String(session.headers['set-cookie']).split(';')[0];
+    const { csrfToken } = session.json<{ csrfToken: string }>();
+    const submit = (text: string, revision: number) =>
+      app.inject({
+        method: 'POST',
+        url: '/mini-app/problems',
+        headers: { cookie, 'x-csrf-token': csrfToken, 'idempotency-key': randomUUID() },
+        payload: { text, revision },
+      });
+    const stale = await submit('привет', 3);
+    expect(stale.statusCode).toBe(409);
+    expect(calls).toBe(0);
+    const ambiguous = await submit('привет', 0);
+    expect(ambiguous.statusCode).toBe(200);
+    expect(ambiguous.json()).toMatchObject({
+      state: { problem: { classification: { type: 'SKILL', path: 'ai' } } },
+    });
+    expect(calls).toBe(1);
+    const deterministic = await submit('не понимаю дроби', 1);
+    expect(deterministic.statusCode).toBe(200);
+    expect(deterministic.json()).toMatchObject({
+      state: { problem: { classification: { type: 'KNOWLEDGE_GAP', path: 'deterministic' } } },
+    });
+    expect(calls).toBe(1);
+  });
+
   it('moves an ambiguous request through explicit clarification and minimal profile collection', async () => {
     process.env.MAX_BOT_TOKEN = token;
     const app = buildServer({

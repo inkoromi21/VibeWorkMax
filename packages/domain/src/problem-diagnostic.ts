@@ -1,7 +1,7 @@
 import { demoDiagnosticCatalog } from '@vibework/content';
 import { validateContract, type DiagnosticContext } from '@vibework/contracts';
 import { newUuid } from '@vibework/shared';
-import type { Pool } from 'pg';
+import type { Pool, PoolClient } from 'pg';
 import type { Classification } from './classification.js';
 import {
   buildDiagnosticPlan,
@@ -33,8 +33,11 @@ export interface CanonicalDiagnosticSession {
 export class PostgresProblemDiagnosticRepository {
   private readonly sessions: PostgresDiagnosticSessionRepository;
 
-  constructor(private readonly pool: Pool) {
-    this.sessions = new PostgresDiagnosticSessionRepository(pool);
+  constructor(
+    private readonly pool: Pool,
+    private readonly transactionClient?: PoolClient,
+  ) {
+    this.sessions = new PostgresDiagnosticSessionRepository(pool, transactionClient);
   }
 
   async createConfirmedSession(input: {
@@ -44,6 +47,23 @@ export class PostgresProblemDiagnosticRepository {
     profile: MinimumDiagnosticProfile;
     traceId?: string;
   }): Promise<CanonicalDiagnosticSession> {
+    if (!this.transactionClient) {
+      const client = await this.pool.connect();
+      try {
+        await client.query('BEGIN');
+        const result = await new PostgresProblemDiagnosticRepository(
+          this.pool,
+          client,
+        ).createConfirmedSession(input);
+        await client.query('COMMIT');
+        return result;
+      } catch (error) {
+        await client.query('ROLLBACK');
+        throw error;
+      } finally {
+        client.release();
+      }
+    }
     if (input.classification.status !== 'classified' || !input.classification.type)
       throw new Error('A confirmed classification is required before creating a session');
     if (!input.rawText.trim() || input.rawText.length > 1_000)
@@ -52,13 +72,17 @@ export class PostgresProblemDiagnosticRepository {
       throw new Error('No more than three interests may be used for diagnostics');
 
     const ids = await this.createProblemAndProfile(input);
-    const decision = await recordClassificationDecision(this.pool, {
-      userId: input.userId,
-      problemVersionId: ids.problemVersionId,
-      problemVersion: ids.problemVersion,
-      classification: input.classification,
-      ...(input.traceId === undefined ? {} : { traceId: input.traceId }),
-    });
+    const decision = await recordClassificationDecision(
+      this.pool,
+      {
+        userId: input.userId,
+        problemVersionId: ids.problemVersionId,
+        problemVersion: ids.problemVersion,
+        classification: input.classification,
+        ...(input.traceId === undefined ? {} : { traceId: input.traceId }),
+      },
+      this.transactionClient,
+    );
     const sessionId = newUuid();
     const interests =
       input.classification.type === 'DIRECTION'
@@ -150,9 +174,10 @@ export class PostgresProblemDiagnosticRepository {
     const problemId = newUuid();
     const problemVersionId = newUuid();
     const profileVersionId = newUuid();
-    const client = await this.pool.connect();
+    const client = this.transactionClient ?? (await this.pool.connect());
+    const ownsTransaction = this.transactionClient === undefined;
     try {
-      await client.query('BEGIN');
+      if (ownsTransaction) await client.query('BEGIN');
       const user = await client.query('SELECT id FROM users WHERE id=$1 FOR UPDATE', [
         input.userId,
       ]);
@@ -183,13 +208,13 @@ export class PostgresProblemDiagnosticRepository {
           },
         ],
       );
-      await client.query('COMMIT');
+      if (ownsTransaction) await client.query('COMMIT');
       return { problemId, problemVersionId, problemVersion: 1, profileVersionId, profileVersion };
     } catch (error) {
-      await client.query('ROLLBACK');
+      if (ownsTransaction) await client.query('ROLLBACK');
       throw error;
     } finally {
-      client.release();
+      if (ownsTransaction) client.release();
     }
   }
 }

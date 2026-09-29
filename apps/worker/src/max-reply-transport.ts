@@ -3,8 +3,7 @@ import type { MaxApiClient } from '../../api/src/max-client.js';
 import type { BotReplyTransport } from './max-bot.js';
 
 type InlineButton =
-  | { type: 'callback'; text: string; payload: string }
-  | { type: 'link'; text: string; url: string };
+  { type: 'callback'; text: string; payload: string } | { type: 'link'; text: string; url: string };
 
 type ReplyClient = Pick<MaxApiClient, 'sendMessage' | 'answerCallback'>;
 
@@ -19,9 +18,7 @@ function inlineKeyboard(input: {
     // MAX `open_app` requires a separately configured public bot name (`web_app`),
     // while this deployment deliberately configures only the verified app URL.
     buttons.push([{ type: 'link', text: input.miniApp.label, url: input.miniApp.url }]);
-  return buttons.length === 0
-    ? undefined
-    : [{ type: 'inline_keyboard', payload: { buttons } }];
+  return buttons.length === 0 ? undefined : [{ type: 'inline_keyboard', payload: { buttons } }];
 }
 
 /**

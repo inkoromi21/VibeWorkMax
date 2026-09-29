@@ -15,6 +15,7 @@ describe('MAX webhook', () => {
         secret: 'valid-secret',
         token: 'token',
         identityEncryptionKey: Buffer.alloc(32, 1).toString('base64url'),
+        providerEventIdField: 'event_id',
       }),
     ).toThrow();
     expect(() =>
@@ -23,8 +24,26 @@ describe('MAX webhook', () => {
         secret: 'valid-secret',
         token: 'token',
         identityEncryptionKey: Buffer.alloc(32, 1).toString('base64url'),
+        providerEventIdField: 'event_id',
       }),
     ).not.toThrow();
+    expect(() =>
+      assertMaxWebhookConfiguration({
+        publicBaseUrl: 'https://bot.example',
+        secret: 'valid-secret',
+        token: 'token',
+        identityEncryptionKey: Buffer.alloc(32, 1).toString('base64url'),
+        providerEventIdField: 'event_specific',
+      }),
+    ).not.toThrow();
+    expect(() =>
+      assertMaxWebhookConfiguration({
+        publicBaseUrl: 'https://bot.example',
+        secret: 'valid-secret',
+        token: 'token',
+        identityEncryptionKey: Buffer.alloc(32, 1).toString('base64url'),
+      }),
+    ).toThrowError(/идентификатора события/i);
   });
   it('rejects an invalid secret without recording an event', async () => {
     const store = new MemoryMaxWebhookStore();
@@ -127,6 +146,33 @@ describe('MAX webhook', () => {
     });
     expect(response.statusCode).toBe(200);
     await app.close();
+  });
+
+  it('deduplicates documented message and callback IDs without accepting unsupported events', () => {
+    const message = parseMaxUpdate(
+      {
+        update_type: 'message_created',
+        message: { body: { mid: 'mid-4', text: 'hello' }, sender: { user_id: 1 } },
+      },
+      undefined,
+      'event_specific',
+    );
+    const callback = parseMaxUpdate(
+      {
+        update_type: 'message_callback',
+        callback: { callback_id: 'button-7', payload: 'next', user: { user_id: 1 } },
+      },
+      undefined,
+      'event_specific',
+    );
+    const unsupported = parseMaxUpdate(
+      { update_type: 'bot_started', timestamp: 123, user: { user_id: 1 } },
+      undefined,
+      'event_specific',
+    );
+    expect(message).toMatchObject({ eventId: 'message:mid-4', hasProviderEventId: true });
+    expect(callback).toMatchObject({ eventId: 'callback:button-7', hasProviderEventId: true });
+    expect(unsupported.hasProviderEventId).toBe(false);
   });
 
   it('encrypts the recipient before a MAX-enabled webhook reaches storage', () => {

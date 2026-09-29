@@ -1,7 +1,10 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { randomUUID } from 'node:crypto';
 import { resolve } from 'node:path';
 import {
   actualAiCost,
+  BENCHMARK_MAX_INPUT_TOKENS,
+  BENCHMARK_MAX_OUTPUT_TOKENS,
   blockedBenchmark,
   budgetPolicyFromEnvironment,
   estimateWorstCaseCost,
@@ -122,8 +125,8 @@ function blockedReasons(input: {
         if (!modelUri) return total;
         const estimate = estimateWorstCaseCost(pricing, providerName, {
           prompt: '',
-          maxInputTokens: 4_000,
-          maxOutputTokens: 600,
+          maxInputTokens: BENCHMARK_MAX_INPUT_TOKENS,
+          maxOutputTokens: BENCHMARK_MAX_OUTPUT_TOKENS,
           modelPolicy: { allowedModels: [modelUri], preferredModel: modelUri },
         });
         return (
@@ -145,6 +148,7 @@ class LedgerGuardedProvider implements AiProvider {
     private readonly ledger: PostgresAiUsageLedger,
     private readonly pricing: NonNullable<ReturnType<typeof pricingCatalogFromEnvironment>>,
     private readonly model: BenchmarkModel,
+    private readonly benchmarkRunId: string,
   ) {}
 
   generateText(request: AiRequest): Promise<AiResult<string>> {
@@ -155,7 +159,7 @@ class LedgerGuardedProvider implements AiProvider {
     const reservation = await this.ledger.preflight({
       request,
       provider: providerName,
-      operationIdentity: `benchmark:${this.model.id}:${String((this.sequence += 1))}`,
+      operationIdentity: `benchmark:${this.benchmarkRunId}:${this.model.id}:${String((this.sequence += 1))}`,
       provenance: { benchmark: true, dataset: 'model-policy-eval-v1' },
     });
     if (reservation.kind !== 'RESERVED')
@@ -264,13 +268,20 @@ async function main(): Promise<void> {
     const pool = new Pool({ connectionString: process.env.DATABASE_URL });
     const ledger = new PostgresAiUsageLedger(pool, pricing, policy);
     const config = yandexAiStudioConfigFromEnvironment(process.env);
+    const benchmarkRunId = randomUUID();
     try {
       result = await runBenchmark({
         dataset,
         models,
         runCount,
         providerForModel: (model) =>
-          new LedgerGuardedProvider(new YandexAiStudioProvider(config), ledger, pricing, model),
+          new LedgerGuardedProvider(
+            new YandexAiStudioProvider(config),
+            ledger,
+            pricing,
+            model,
+            benchmarkRunId,
+          ),
       });
     } finally {
       await pool.end();

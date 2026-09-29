@@ -5,7 +5,7 @@ import {
 } from '@vibework/content';
 import type { DiagnosticContext, Evidence, MasteryPolicy } from '@vibework/contracts';
 import { newUuid } from '@vibework/shared';
-import type { Pool } from 'pg';
+import type { Pool, PoolClient } from 'pg';
 import type { Classification } from './classification.js';
 import {
   buildDiagnosticResult,
@@ -240,7 +240,30 @@ export function assertDiagnosticAnswerAllowed(input: {
 
 /** PostgreSQL boundary for immutable snapshots and server-enforced question limits. */
 export class PostgresDiagnosticSessionRepository {
-  constructor(private readonly pool: Pool) {}
+  constructor(
+    private readonly pool: Pool,
+    private readonly transactionClient?: PoolClient,
+  ) {}
+
+  private get db(): Pick<Pool, 'query'> {
+    return this.transactionClient ?? this.pool;
+  }
+
+  private async inTransaction<T>(run: (client: PoolClient) => Promise<T>): Promise<T> {
+    if (this.transactionClient) return run(this.transactionClient);
+    const client = await this.pool.connect();
+    try {
+      await client.query('BEGIN');
+      const result = await run(client);
+      await client.query('COMMIT');
+      return result;
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
 
   async create(input: {
     sessionId?: string;
@@ -252,9 +275,7 @@ export class PostgresDiagnosticSessionRepository {
     parentResultId?: string;
   }): Promise<string> {
     const sessionId = input.sessionId ?? newUuid();
-    const client = await this.pool.connect();
-    try {
-      await client.query('BEGIN');
+    return this.inTransaction(async (client) => {
       await client.query(
         `INSERT INTO diagnostic_sessions(id,user_id,problem_version_id,classification_decision_id,snapshot,plan,catalog_version,method_version,template_version,parent_session_id,parent_result_id) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`,
         [
@@ -271,18 +292,12 @@ export class PostgresDiagnosticSessionRepository {
           input.parentResultId ?? null,
         ],
       );
-      await client.query('COMMIT');
       return sessionId;
-    } catch (error) {
-      await client.query('ROLLBACK');
-      throw error;
-    } finally {
-      client.release();
-    }
+    });
   }
 
   async grantAdditionalConsent(input: { sessionId: string; userId: string }): Promise<void> {
-    const result = await this.pool.query(
+    const result = await this.db.query(
       `UPDATE diagnostic_sessions SET additional_consent_at=COALESCE(additional_consent_at,now()) WHERE id=$1 AND user_id=$2 AND question_count >= $3`,
       [input.sessionId, input.userId, DIAGNOSTIC_MAIN_LIMIT],
     );
@@ -296,12 +311,15 @@ export class PostgresDiagnosticSessionRepository {
     seed: string;
     preferences?: DiagnosticSelectorPreferences;
   }): Promise<
-    | { kind: 'QUESTION'; questionInstanceId: string; publicQuestion: Record<string, unknown> }
+    | {
+        kind: 'QUESTION';
+        questionInstanceId: string;
+        sessionRevision: number;
+        publicQuestion: Record<string, unknown>;
+      }
     | { kind: 'STOP'; reason: string }
   > {
-    const client = await this.pool.connect();
-    try {
-      await client.query('BEGIN');
+    return this.inTransaction(async (client) => {
       const session = await client.query<{
         status: 'IN_PROGRESS' | 'PAUSED' | 'COMPLETED' | 'COMPLETED_PARTIAL';
         question_count: number;
@@ -327,10 +345,10 @@ export class PostgresDiagnosticSessionRepository {
       if (outstanding.rowCount === 1) {
         const outstandingQuestion = outstanding.rows[0];
         if (!outstandingQuestion) throw new Error('Outstanding diagnostic question is unavailable');
-        await client.query('COMMIT');
         return {
           kind: 'QUESTION',
           questionInstanceId: outstandingQuestion.id,
+          sessionRevision: Number(outstandingQuestion.public_payload.session_revision),
           publicQuestion: outstandingQuestion.public_payload,
         };
       }
@@ -400,14 +418,14 @@ export class PostgresDiagnosticSessionRepository {
         seed: input.seed,
       });
       if (decision.kind === 'STOP') {
-        await client.query('COMMIT');
         return decision;
       }
       const template = decision.question.template;
       const questionInstanceId = newUuid();
+      const nextRevision = row.revision + 1;
       const publicQuestion = {
         question_instance_id: questionInstanceId,
-        session_revision: row.revision,
+        session_revision: nextRevision,
         question_kind:
           template.kind === 'CHOICE'
             ? 'SINGLE_CHOICE'
@@ -435,38 +453,65 @@ export class PostgresDiagnosticSessionRepository {
           publicQuestion,
         ],
       );
-      await client.query('COMMIT');
-      return { kind: 'QUESTION', questionInstanceId, publicQuestion };
-    } catch (error) {
-      await client.query('ROLLBACK');
-      throw error;
-    } finally {
-      client.release();
-    }
+      await client.query('UPDATE diagnostic_sessions SET revision=$2 WHERE id=$1', [
+        input.sessionId,
+        nextRevision,
+      ]);
+      return {
+        kind: 'QUESTION',
+        questionInstanceId,
+        sessionRevision: nextRevision,
+        publicQuestion,
+      };
+    });
   }
 
   async saveAnswer(input: {
     sessionId: string;
     userId: string;
+    questionInstanceId?: string;
+    expectedRevision?: number;
+    idempotencyKey?: string;
     kind: 'CHOICE' | 'TEXT' | 'SKIP' | 'DONT_KNOW';
     value: string[] | string | null;
     assistanceReported?: 'NONE' | 'HINT' | 'SOLUTION';
-  }): Promise<void> {
-    const client = await this.pool.connect();
-    try {
-      await client.query('BEGIN');
+  }): Promise<{ answerSubmissionId: string; sessionRevision: number; duplicate: boolean }> {
+    return this.inTransaction(async (client) => {
       const session = await client.query<{
         question_count: number;
         additional_consent_at: Date | null;
         status: string;
+        revision: number;
       }>(
-        'SELECT question_count,additional_consent_at,status FROM diagnostic_sessions WHERE id=$1 AND user_id=$2 FOR UPDATE',
+        'SELECT question_count,additional_consent_at,status,revision FROM diagnostic_sessions WHERE id=$1 AND user_id=$2 FOR UPDATE',
         [input.sessionId, input.userId],
       );
       const row = session.rows[0];
       if (!row) throw new Error('Diagnostic session not found');
       if (row.status !== 'IN_PROGRESS')
         throw new Error('Diagnostic session is not accepting answers');
+      if (input.idempotencyKey) {
+        const existing = await client.query<{ id: string; question_instance_id: string }>(
+          `SELECT id,question_instance_id FROM diagnostic_answer_submissions
+           WHERE session_id=$1 AND idempotency_key=$2`,
+          [input.sessionId, input.idempotencyKey],
+        );
+        const duplicate = existing.rows[0];
+        if (duplicate) {
+          if (
+            input.questionInstanceId &&
+            duplicate.question_instance_id !== input.questionInstanceId
+          )
+            throw new Error('Diagnostic idempotency key belongs to another question');
+          return {
+            answerSubmissionId: duplicate.id,
+            sessionRevision: row.revision,
+            duplicate: true,
+          };
+        }
+      }
+      if (input.expectedRevision !== undefined && row.revision !== input.expectedRevision)
+        throw new Error('Diagnostic session revision conflict');
       assertDiagnosticAnswerAllowed({
         answeredCount: row.question_count,
         additionalConsent: row.additional_consent_at !== null,
@@ -477,17 +522,25 @@ export class PostgresDiagnosticSessionRepository {
         area: string;
         evidence_role: string;
       }>(
-        'SELECT id,template_version_id,area,evidence_role FROM diagnostic_question_instances WHERE session_id=$1 AND ordinal=$2',
-        [input.sessionId, row.question_count],
+        `SELECT q.id,q.template_version_id,q.area,q.evidence_role
+         FROM diagnostic_question_instances q
+         LEFT JOIN diagnostic_answer_submissions a ON a.question_instance_id=q.id
+         WHERE q.session_id=$1 AND ($2::uuid IS NULL OR q.id=$2) AND a.id IS NULL
+         ORDER BY q.ordinal DESC LIMIT 1`,
+        [input.sessionId, input.questionInstanceId ?? null],
       );
       const questionInstanceId = question.rows[0]?.id;
       if (!questionInstanceId) throw new Error('Diagnostic question is unavailable');
       const issuedQuestion = question.rows[0];
       if (!issuedQuestion) throw new Error('Diagnostic question is unavailable');
       const answerId = newUuid();
+      const idempotencyKey =
+        input.idempotencyKey ?? `${questionInstanceId}:${String(row.revision)}`;
       const assistance = input.assistanceReported ?? 'NONE';
-      const inserted = await client.query(
-        `INSERT INTO diagnostic_answer_submissions(id,session_id,question_instance_id,answer_kind,answer_value,assistance_reported) VALUES ($1,$2,$3,$4,$5,$6) ON CONFLICT(session_id,question_instance_id) DO NOTHING`,
+      const inserted = await client.query<{ id: string }>(
+        `INSERT INTO diagnostic_answer_submissions(id,session_id,question_instance_id,answer_kind,answer_value,assistance_reported,idempotency_key)
+         VALUES ($1,$2,$3,$4,$5,$6,$7)
+         ON CONFLICT(session_id,idempotency_key) DO NOTHING RETURNING id`,
         [
           answerId,
           input.sessionId,
@@ -495,9 +548,22 @@ export class PostgresDiagnosticSessionRepository {
           input.kind,
           input.value === null ? null : JSON.stringify(input.value),
           assistance,
+          idempotencyKey,
         ],
       );
-      if (inserted.rowCount !== 1) throw new Error('Diagnostic answer already submitted');
+      if (inserted.rowCount !== 1) {
+        const duplicate = await client.query<{ id: string }>(
+          'SELECT id FROM diagnostic_answer_submissions WHERE session_id=$1 AND idempotency_key=$2 AND question_instance_id=$3',
+          [input.sessionId, idempotencyKey, questionInstanceId],
+        );
+        const duplicateId = duplicate.rows[0]?.id;
+        if (!duplicateId) throw new Error('Diagnostic answer already submitted');
+        return {
+          answerSubmissionId: duplicateId,
+          sessionRevision: row.revision,
+          duplicate: true,
+        };
+      }
       const role =
         input.kind === 'SKIP' || input.kind === 'DONT_KNOW'
           ? 'UNKNOWN'
@@ -541,16 +607,15 @@ export class PostgresDiagnosticSessionRepository {
         ],
       );
       await client.query(
-        'UPDATE diagnostic_sessions SET question_count=question_count+1 WHERE id=$1',
+        'UPDATE diagnostic_sessions SET question_count=question_count+1,revision=revision+1 WHERE id=$1',
         [input.sessionId],
       );
-      await client.query('COMMIT');
-    } catch (error) {
-      await client.query('ROLLBACK');
-      throw error;
-    } finally {
-      client.release();
-    }
+      return {
+        answerSubmissionId: answerId,
+        sessionRevision: row.revision + 1,
+        duplicate: false,
+      };
+    });
   }
 
   async recordAssessmentEvidence(input: {
@@ -601,9 +666,7 @@ export class PostgresDiagnosticSessionRepository {
       | 'PAUSED';
     evaluatedAt: string;
   }): Promise<{ resultId: string; result: DiagnosticResult }> {
-    const client = await this.pool.connect();
-    try {
-      await client.query('BEGIN');
+    return this.inTransaction(async (client) => {
       const session = await client.query<{
         status: 'IN_PROGRESS' | 'PAUSED' | 'COMPLETED' | 'COMPLETED_PARTIAL';
         snapshot: DiagnosticContextSnapshot;
@@ -630,6 +693,23 @@ export class PostgresDiagnosticSessionRepository {
         'SELECT evidence,question_instance_id,answer_submission_id,role,disclosed FROM diagnostic_evidence_records WHERE session_id=$1 ORDER BY created_at,id',
         [input.sessionId],
       );
+      const policies =
+        input.policies.length > 0
+          ? input.policies
+          : [...new Set(records.rows.map((record) => record.evidence.competency_id))]
+              .sort()
+              .map((competencyId): MasteryPolicy => ({
+                policy_version: 'diagnostic-evidence-policy-v1',
+                competency_id: competencyId,
+                required_criteria: ['response'],
+                required_independent_families: 1,
+                minimum_difficulty: 1,
+                allowed_assistance: ['NONE', 'HINT'],
+                validity_days: 30,
+                requires_integrative_task: false,
+                compatible_rubric_versions: ['diagnostic-unassessed-v1'],
+                foundation_criteria: ['response'],
+              }));
       const result = buildDiagnosticResult({
         context: row.snapshot.context,
         session: { id: input.sessionId, status: row.status },
@@ -640,7 +720,7 @@ export class PostgresDiagnosticSessionRepository {
           role: record.role,
           disclosed: record.disclosed,
         })),
-        policies: input.policies,
+        policies,
         stoppingReason: input.stoppingReason,
         evaluatedAt: input.evaluatedAt,
         catalogVersion: row.catalog_version,
@@ -658,18 +738,12 @@ export class PostgresDiagnosticSessionRepository {
          WHERE id=$1`,
         [input.sessionId, result.status],
       );
-      await client.query('COMMIT');
       return { resultId, result };
-    } catch (error) {
-      await client.query('ROLLBACK');
-      throw error;
-    } finally {
-      client.release();
-    }
+    });
   }
 
   async resume(input: { sessionId: string; userId: string }): Promise<void> {
-    const result = await this.pool.query(
+    const result = await this.db.query(
       `UPDATE diagnostic_sessions SET status='IN_PROGRESS',revision=revision+1
        WHERE id=$1 AND user_id=$2 AND status='PAUSED'`,
       [input.sessionId, input.userId],
@@ -682,7 +756,7 @@ export class PostgresDiagnosticSessionRepository {
     userId: string;
     sessionIdForReassess?: string;
   }): Promise<string> {
-    const parent = await this.pool.query<{
+    const parent = await this.db.query<{
       problem_version_id: string;
       classification_decision_id: string;
       snapshot: DiagnosticContextSnapshot;
@@ -711,6 +785,137 @@ export class PostgresDiagnosticSessionRepository {
       parentSessionId: input.sessionId,
       parentResultId: row.result_id,
     });
+  }
+}
+
+/** Shared canonical use-case boundary for MAX bot and mini app. */
+export class DiagnosticApplicationService {
+  private readonly sessions: PostgresDiagnosticSessionRepository;
+
+  constructor(
+    private readonly pool: Pool,
+    private readonly catalog: DiagnosticCatalog,
+    private readonly transactionClient?: PoolClient,
+  ) {
+    this.sessions = new PostgresDiagnosticSessionRepository(pool, transactionClient);
+  }
+
+  issueNext(input: {
+    sessionId: string;
+    userId: string;
+    preferences?: DiagnosticSelectorPreferences;
+  }) {
+    return this.sessions.issueNextQuestion({
+      ...input,
+      catalog: this.catalog,
+      seed: input.sessionId,
+    });
+  }
+
+  async answerAndIssue(input: {
+    sessionId: string;
+    userId: string;
+    questionInstanceId: string;
+    expectedRevision: number;
+    idempotencyKey: string;
+    kind: 'CHOICE' | 'TEXT' | 'SKIP' | 'DONT_KNOW';
+    value: string[] | string | null;
+    assistanceReported?: 'NONE' | 'HINT' | 'SOLUTION';
+  }): Promise<{
+    created: boolean;
+    sessionRevision: number;
+    questionInstanceId: string | null;
+    publicQuestion: Record<string, unknown> | null;
+    stoppedReason?: string;
+  }> {
+    if (!this.transactionClient) {
+      const client = await this.pool.connect();
+      try {
+        await client.query('BEGIN');
+        const result = await new DiagnosticApplicationService(
+          this.pool,
+          this.catalog,
+          client,
+        ).answerAndIssue(input);
+        await client.query('COMMIT');
+        return result;
+      } catch (error) {
+        await client.query('ROLLBACK');
+        throw error;
+      } finally {
+        client.release();
+      }
+    }
+    const saved = await this.sessions.saveAnswer(input);
+    const issued = await this.issueNext({ sessionId: input.sessionId, userId: input.userId });
+    return issued.kind === 'QUESTION'
+      ? {
+          created: !saved.duplicate,
+          sessionRevision: issued.sessionRevision,
+          questionInstanceId: issued.questionInstanceId,
+          publicQuestion: issued.publicQuestion,
+        }
+      : {
+          created: !saved.duplicate,
+          sessionRevision: saved.sessionRevision,
+          questionInstanceId: null,
+          publicQuestion: null,
+          stoppedReason: issued.reason,
+        };
+  }
+
+  grantAdditionalConsent(input: { sessionId: string; userId: string }) {
+    return this.sessions.grantAdditionalConsent(input);
+  }
+
+  async grantAdditionalConsentAndIssue(input: { sessionId: string; userId: string }): Promise<{
+    questionInstanceId: string;
+    sessionRevision: number;
+    publicQuestion: Record<string, unknown>;
+  }> {
+    if (!this.transactionClient) {
+      const client = await this.pool.connect();
+      try {
+        await client.query('BEGIN');
+        const result = await new DiagnosticApplicationService(
+          this.pool,
+          this.catalog,
+          client,
+        ).grantAdditionalConsentAndIssue(input);
+        await client.query('COMMIT');
+        return result;
+      } catch (error) {
+        await client.query('ROLLBACK');
+        throw error;
+      } finally {
+        client.release();
+      }
+    }
+    await this.sessions.grantAdditionalConsent(input);
+    const issued = await this.issueNext(input);
+    if (issued.kind !== 'QUESTION')
+      throw new Error(`Additional diagnostic question is unavailable: ${issued.reason}`);
+    return issued;
+  }
+
+  finish(input: {
+    sessionId: string;
+    userId: string;
+    policies: readonly MasteryPolicy[];
+    stoppingReason:
+      | 'ALL_TARGETS_RESOLVED'
+      | 'HARD_LIMIT'
+      | 'NO_ELIGIBLE_QUESTION'
+      | 'ADDITIONAL_CONSENT_REQUIRED'
+      | 'USER_FINISHED'
+      | 'PAUSED';
+    evaluatedAt: string;
+  }) {
+    return this.sessions.finish(input);
+  }
+
+  resume(input: { sessionId: string; userId: string }) {
+    return this.sessions.resume(input);
   }
 }
 
@@ -751,13 +956,15 @@ export async function recordClassificationDecision(
     classification: Classification;
     traceId?: string;
   },
+  transactionClient?: PoolClient,
 ): Promise<{ decisionId: string; eventId: string }> {
   const decisionId = newUuid();
   const eventId = newUuid();
-  const client = await pool.connect();
+  const client = transactionClient ?? (await pool.connect());
+  const ownsTransaction = transactionClient === undefined;
   const metadata = classificationDecisionMetadata(input.classification, input.traceId);
   try {
-    await client.query('BEGIN');
+    if (ownsTransaction) await client.query('BEGIN');
     await client.query(
       `INSERT INTO decision_events(event_id,actor_type,actor_id,action,target_type,target_id,target_version,metadata) VALUES ($1,$2,$3,'PROBLEM_CLASSIFIED','PROBLEM_VERSION',$4,$5,$6)`,
       [
@@ -798,12 +1005,12 @@ export async function recordClassificationDecision(
         input.classification.clarificationNeeded,
       ],
     );
-    await client.query('COMMIT');
+    if (ownsTransaction) await client.query('COMMIT');
     return { decisionId, eventId };
   } catch (error) {
-    await client.query('ROLLBACK');
+    if (ownsTransaction) await client.query('ROLLBACK');
     throw error;
   } finally {
-    client.release();
+    if (ownsTransaction) client.release();
   }
 }

@@ -1,13 +1,14 @@
 import { createHash } from 'node:crypto';
 import { demoDiagnosticCatalog, selectApprovedDiagnosticTemplates } from '@vibework/content';
 import { ApplicationError, newUuid, type AttemptId, type ConversationId } from '@vibework/shared';
-import type { Pool } from 'pg';
+import type { Pool, PoolClient } from 'pg';
 import { classifyProblem, type Classification } from './classification.js';
 import {
   PostgresProblemDiagnosticRepository,
   type MinimumDiagnosticProfile,
 } from './problem-diagnostic.js';
-import { PostgresDiagnosticSessionRepository } from './diagnostics.js';
+import { DiagnosticApplicationService } from './diagnostics.js';
+import type { DiagnosticResult } from './diagnostic-adaptive.js';
 
 /**
  * Bot-first aggregate. It deliberately keeps provider message details out of the
@@ -129,8 +130,31 @@ export interface BotRepository {
     rawText: string,
     interpretation: Classification,
     profile: MinimumDiagnosticProfile,
-  ): Promise<{ sessionId?: string }>;
-  grantAdditionalConsent?(actorId: string, sessionId: string): Promise<void>;
+  ): Promise<{
+    sessionId?: string;
+    question?: {
+      questionInstanceId: string;
+      sessionRevision: number;
+      publicQuestion: Record<string, unknown>;
+    };
+  }>;
+  grantAdditionalConsent?(
+    actorId: string,
+    sessionId: string,
+  ): Promise<
+    | {
+        questionInstanceId: string;
+        sessionRevision: number;
+        publicQuestion: Record<string, unknown>;
+      }
+    | undefined
+  >;
+  finishDiagnostic?(
+    actorId: string,
+    sessionId: string,
+    reason: 'USER_FINISHED' | 'PAUSED',
+  ): Promise<DiagnosticResult | undefined>;
+  resumeDiagnostic?(actorId: string, sessionId: string): Promise<void>;
   saveAnswer(input: {
     actorId: string;
     questionId: string;
@@ -138,15 +162,26 @@ export interface BotRepository {
     kind: 'CHOICE' | 'TEXT' | 'SKIP' | 'DONT_KNOW';
     value: string[] | string | null;
     diagnosticSessionId?: string;
-  }): Promise<boolean>;
+    questionInstanceId?: string;
+    sessionRevision?: number;
+  }): Promise<{
+    created: boolean;
+    question?: {
+      questionInstanceId: string;
+      sessionRevision: number;
+      publicQuestion: Record<string, unknown>;
+    };
+    stoppedReason?: string;
+  }>;
   saveAttempt(input: {
     actorId: string;
     key: string;
     answer: string;
     assistance: 'NONE' | 'SOLUTION';
   }): Promise<{ id: AttemptId; created: boolean }>;
+  saveDispute(actorId: string, attemptId: string, reason: string): Promise<boolean>;
   saveGoal(actorId: string, text: string): Promise<boolean>;
-  saveConsent(actorId: string, version: string): Promise<void>;
+  saveConsent(actorId: string, version: string, age: number): Promise<void>;
   recordStepOpened(actorId: string, stepId: string, position: number): Promise<boolean>;
   saveNotification(eventId: string): Promise<boolean>;
 }
@@ -303,8 +338,17 @@ function diagnosticQuestionsFor(c: BotConversation) {
 function diagnosisReply(c: BotConversation): BotReply {
   const index = Number(c.data.questionIndex ?? 0);
   const diagnosticQuestions = diagnosticQuestionsFor(c);
-  const q =
-    diagnosticQuestions[Math.min(index, diagnosticQuestions.length - 1)] ?? diagnosticQuestions[0];
+  const canonical = c.data.canonicalQuestion as
+    { publicQuestion?: { prompt?: string; options?: { label: string }[] } } | undefined;
+  const q = canonical?.publicQuestion
+    ? {
+        id: 'canonical',
+        kind: canonical.publicQuestion.options?.length ? 'CHOICE' : 'TEXT',
+        prompt: canonical.publicQuestion.prompt ?? '',
+        options: canonical.publicQuestion.options?.map((option) => option.label) ?? [],
+      }
+    : (diagnosticQuestions[Math.min(index, diagnosticQuestions.length - 1)] ??
+      diagnosticQuestions[0]);
   const label =
     index >= 8
       ? 'Это дополнительный вопрос; можно завершить в любой момент.'
@@ -419,7 +463,11 @@ export class BotService {
       case 'newProblem':
         return next(c, 'PROBLEM', {});
       case 'continue':
-        return next(c, c.state === 'PAUSED' ? 'DIAGNOSIS' : 'CONTINUATION', c.data);
+        return next(
+          c,
+          c.state === 'PAUSED' ? 'DIAGNOSIS' : 'CONTINUATION',
+          c.state === 'PAUSED' ? { ...c.data, resumeDiagnostic: true } : c.data,
+        );
       case 'edit':
         return next(c, 'PROBLEM', {});
       case 'restart':
@@ -476,9 +524,9 @@ export class BotService {
           answerKind: action === 'skip' ? 'SKIP' : 'DONT_KNOW',
         });
       case 'pause':
-        return next(c, 'PAUSED', c.data);
+        return next(c, 'PAUSED', { ...c.data, pauseDiagnostic: true });
       case 'finish':
-        return next(c, 'RESULT', c.data);
+        return next(c, 'RESULT', { ...c.data, finishDiagnostic: true });
       case 'more':
         return next(c, 'DIAGNOSIS', {
           ...c.data,
@@ -499,7 +547,7 @@ export class BotService {
       case 'retry':
         return next(c, 'ATTEMPT', { ...c.data, attemptAnswer: undefined, solutionShown: false });
       case 'dispute':
-        return next(c, 'CONTINUATION', { ...c.data, dispute: true });
+        return next(c, 'CONTINUATION', { ...c.data, disputeRequested: true });
       case 'details':
         return next(c, 'CONTINUATION', c.data);
       case 'choice':
@@ -614,7 +662,8 @@ export class BotService {
           ],
           jobs,
         };
-      if (this.policy.version) await this.repository.saveConsent(c.actorId, this.policy.version);
+      if (this.policy.version)
+        await this.repository.saveConsent(c.actorId, this.policy.version, age);
       return {
         replies: [
           reply(
@@ -683,6 +732,12 @@ export class BotService {
         jobs,
       };
     if (c.state === 'DIAGNOSIS') {
+      if (c.data.resumeDiagnostic === true && typeof c.data.diagnosticSessionId === 'string') {
+        await this.repository.resumeDiagnostic?.(c.actorId, c.data.diagnosticSessionId);
+        const resumed = next(c, 'DIAGNOSIS', { ...c.data, resumeDiagnostic: false });
+        await this.repository.transact(`resume:${command.eventId}`, c.actorId, () => resumed);
+        return this.present(resumed, command);
+      }
       if (c.data.problemConfirmed === true) {
         const rawText = c.data.draftText;
         const interpretation = c.data.classification;
@@ -703,17 +758,22 @@ export class BotService {
           ...c.data,
           problemConfirmed: false,
           ...(saved.sessionId === undefined ? {} : { diagnosticSessionId: saved.sessionId }),
+          ...(saved.question === undefined ? {} : { canonicalQuestion: saved.question }),
         });
         await this.repository.transact(`problem:${command.eventId}`, c.actorId, () => confirmed);
         return this.present(confirmed, command);
       }
       if (c.data.additionalConsentJustGranted === true) {
         const sessionId = c.data.diagnosticSessionId;
-        if (typeof sessionId === 'string')
-          await this.repository.grantAdditionalConsent?.(c.actorId, sessionId);
+        const issued =
+          typeof sessionId === 'string'
+            ? await this.repository.grantAdditionalConsent?.(c.actorId, sessionId)
+            : undefined;
         const consented = next(c, 'DIAGNOSIS', {
           ...c.data,
           additionalConsentJustGranted: false,
+          awaitingAdditionalConsent: false,
+          ...(issued ? { canonicalQuestion: issued } : {}),
         });
         await this.repository.transact(`consent:${command.eventId}`, c.actorId, () => consented);
         return this.present(consented, command);
@@ -739,7 +799,7 @@ export class BotService {
         const q =
           diagnosticQuestions[Math.min(index, diagnosticQuestions.length - 1)] ??
           diagnosticQuestions[0];
-        await this.repository.saveAnswer({
+        const savedAnswer = await this.repository.saveAnswer({
           actorId: c.actorId,
           questionId: q.id,
           idempotencyKey: `${c.id}:${String(c.revision)}`,
@@ -758,6 +818,16 @@ export class BotService {
           ...(typeof c.data.diagnosticSessionId === 'string'
             ? { diagnosticSessionId: c.data.diagnosticSessionId }
             : {}),
+          ...(c.data.canonicalQuestion && typeof c.data.canonicalQuestion === 'object'
+            ? {
+                questionInstanceId: String(
+                  (c.data.canonicalQuestion as { questionInstanceId?: unknown }).questionInstanceId,
+                ),
+                sessionRevision: Number(
+                  (c.data.canonicalQuestion as { sessionRevision?: unknown }).sessionRevision,
+                ),
+              }
+            : {}),
         });
         const nextCount = count + 1;
         const continueDiagnosis =
@@ -771,6 +841,8 @@ export class BotService {
           answerKind: undefined,
           answerValue: undefined,
           textAnswer: undefined,
+          canonicalQuestion: savedAnswer.question,
+          finishDiagnostic: !continueDiagnosis && !needsConsent,
         });
         await this.repository.transact(`advance:${command.eventId}`, c.actorId, () => advanced);
         return this.present(advanced, command);
@@ -778,21 +850,39 @@ export class BotService {
       return { replies: [diagnosisReply(c)], jobs };
     }
     if (c.state === 'PAUSED')
-      return {
-        replies: [
-          reply('Пауза сохранена. Вернуться можно в любой момент.', c, [
-            ['Продолжить', 'continue'],
-          ]),
-        ],
-        jobs,
-      };
+      return (async () => {
+        if (c.data.pauseDiagnostic === true && typeof c.data.diagnosticSessionId === 'string')
+          await this.repository.finishDiagnostic?.(c.actorId, c.data.diagnosticSessionId, 'PAUSED');
+        return {
+          replies: [
+            reply('Пауза сохранена. Вернуться можно в любой момент.', c, [
+              ['Продолжить', 'continue'],
+            ]),
+          ],
+          jobs,
+        };
+      })();
     if (c.state === 'RESULT') {
-      const answers = Number(c.data.answerCount ?? 0);
-      const status = answers === 0 ? 'unknown' : answers < 4 ? 'gap' : 'known';
+      const canonicalResult =
+        c.data.finishDiagnostic === true && typeof c.data.diagnosticSessionId === 'string'
+          ? await this.repository.finishDiagnostic?.(
+              c.actorId,
+              c.data.diagnosticSessionId,
+              'USER_FINISHED',
+            )
+          : undefined;
+      const summary = canonicalResult
+        ? [
+            `Подтверждено: ${String(canonicalResult.known.length)}`,
+            `Требует работы: ${String(canonicalResult.gaps.length)}`,
+            `Пока неизвестно: ${String(canonicalResult.unknown.length)}`,
+            canonicalResult.explanation,
+          ].join('\n')
+        : 'Канонический результат пока не сформирован; знания не считаются подтверждёнными.';
       return {
         replies: [
           reply(
-            `Результат: ${status}. Подтверждено только по вашим ответам; неизвестное остаётся неизвестным. Первый шаг — короткая практика по выбранной теме. Источник: ответы диагностики (${String(answers)}). Точность в процентах не заявляется.`,
+            `${summary}\nПервый шаг — короткая практика по выбранной теме. Точность в процентах не заявляется.`,
             c,
             [
               ['Подтвердить цель', 'goal'],
@@ -863,12 +953,18 @@ export class BotService {
           answer: c.data.attemptAnswer,
           assistance: c.data.solutionShown === true ? 'SOLUTION' : 'NONE',
         });
+        const recorded = next(c, 'ATTEMPT', {
+          ...c.data,
+          attemptAnswer: undefined,
+          lastAttemptId: saved.id,
+        });
+        await this.repository.transact(`attempt:${command.eventId}`, c.actorId, () => recorded);
         jobs.push({ type: 'attempt.grade', key: `attempt:${saved.id}` });
         return {
           replies: [
             reply(
               'Попытка принята и проверяется по версии рубрики. Полное решение пока не раскрываю.',
-              c,
+              recorded,
               [
                 ['Попробовать снова', 'retry'],
                 ['Объяснить ошибку', 'solution'],
@@ -894,10 +990,16 @@ export class BotService {
         jobs,
       };
     }
+    if (c.data.disputeRequested === true && typeof c.data.lastAttemptId === 'string')
+      await this.repository.saveDispute(
+        c.actorId,
+        c.data.lastAttemptId,
+        'Пользователь оспорил результат в MAX-боте',
+      );
     return {
       replies: [
         reply(
-          c.data.dispute === true
+          c.data.disputeRequested === true
             ? 'Спор по попытке создан без раскрытия лишних данных. Пока можно продолжить обучение.'
             : 'Продолжим с последнего сохранённого шага.',
           c,
@@ -967,11 +1069,11 @@ export class MemoryBotRepository implements BotRepository {
     actorId: string;
     questionId: string;
     idempotencyKey: string;
-  }): Promise<boolean> {
+  }): Promise<{ created: boolean }> {
     const key = `${input.actorId}:${input.questionId}:${input.idempotencyKey}`;
-    if (this.answers.has(key)) return Promise.resolve(false);
+    if (this.answers.has(key)) return Promise.resolve({ created: false });
     this.answers.add(key);
-    return Promise.resolve(true);
+    return Promise.resolve({ created: true });
   }
   saveAttempt(input: {
     actorId: string;
@@ -983,6 +1085,9 @@ export class MemoryBotRepository implements BotRepository {
     const id = newUuid<AttemptId>();
     this.attempts.set(key, id);
     return Promise.resolve({ id, created: true });
+  }
+  saveDispute(): Promise<boolean> {
+    return Promise.resolve(true);
   }
   saveGoal(actorId: string): Promise<boolean> {
     if (this.goals.has(actorId)) return Promise.resolve(false);
@@ -1007,12 +1112,26 @@ export class MemoryBotRepository implements BotRepository {
 
 /** PostgreSQL implementation; every state change is guarded by a processed-event row. */
 export class PostgresBotRepository implements BotRepository {
-  constructor(private readonly pool: Pool) {}
+  constructor(
+    private readonly pool: Pool,
+    private readonly transactionClient?: PoolClient,
+  ) {}
+  private get db(): Pick<Pool, 'query'> {
+    return this.transactionClient ?? this.pool;
+  }
+  private get diagnostics(): DiagnosticApplicationService {
+    return new DiagnosticApplicationService(
+      this.pool,
+      demoDiagnosticCatalog,
+      this.transactionClient,
+    );
+  }
   private async userIdForActor(actorId: string): Promise<string> {
     const actorHash = actorDigest(actorId);
-    const client = await this.pool.connect();
+    const client = this.transactionClient ?? (await this.pool.connect());
+    const ownsTransaction = this.transactionClient === undefined;
     try {
-      await client.query('BEGIN');
+      if (ownsTransaction) await client.query('BEGIN');
       const known = await client.query<{ user_id: string }>(
         'SELECT user_id FROM max_user_identities WHERE actor_id_hash=$1 FOR UPDATE',
         [actorHash],
@@ -1025,17 +1144,17 @@ export class PostgresBotRepository implements BotRepository {
           [userId, actorHash],
         );
       }
-      await client.query('COMMIT');
+      if (ownsTransaction) await client.query('COMMIT');
       return userId;
     } catch (error) {
-      await client.query('ROLLBACK');
+      if (ownsTransaction) await client.query('ROLLBACK');
       throw error;
     } finally {
-      client.release();
+      if (ownsTransaction) client.release();
     }
   }
   async get(actorId: string): Promise<BotConversation | null> {
-    const result = await this.pool.query<{
+    const result = await this.db.query<{
       id: ConversationId;
       state: BotConversationState;
       revision: number;
@@ -1063,9 +1182,10 @@ export class PostgresBotRepository implements BotRepository {
     apply: (current: BotConversation | null) => BotConversation,
   ): Promise<{ conversation: BotConversation; duplicate: boolean }> {
     const actorHash = actorDigest(actorId);
-    const client = await this.pool.connect();
+    const client = this.transactionClient ?? (await this.pool.connect());
+    const ownsTransaction = this.transactionClient === undefined;
     try {
-      await client.query('BEGIN');
+      if (ownsTransaction) await client.query('BEGIN');
       const event = await client.query(
         `INSERT INTO bot_processed_events(event_id, actor_id_hash) VALUES ($1,$2) ON CONFLICT DO NOTHING RETURNING event_id`,
         [eventId, actorHash],
@@ -1081,7 +1201,7 @@ export class PostgresBotRepository implements BotRepository {
         [actorHash],
       );
       const row = currentResult.rows[0];
-      const current = row
+      let current: BotConversation | null = row
         ? {
             id: row.id,
             actorId,
@@ -1092,21 +1212,78 @@ export class PostgresBotRepository implements BotRepository {
           }
         : null;
       if (event.rowCount !== 1) {
-        await client.query('COMMIT');
+        if (ownsTransaction) await client.query('COMMIT');
         return { conversation: current ?? conversation(actorId), duplicate: true };
+      }
+      if (
+        current &&
+        (current.state === 'DIAGNOSIS' || current.state === 'PAUSED') &&
+        typeof current.data.diagnosticSessionId === 'string'
+      ) {
+        const canonical = await client.query<{
+          status: string;
+          question_count: number;
+          additional_consent_at: Date | null;
+          question_instance_id: string | null;
+          public_payload: Record<string, unknown> | null;
+        }>(
+          `SELECT s.status,s.question_count,s.additional_consent_at,
+                  q.id AS question_instance_id,q.public_payload
+           FROM diagnostic_sessions s
+           LEFT JOIN LATERAL (
+             SELECT qi.id,qi.public_payload FROM diagnostic_question_instances qi
+             LEFT JOIN diagnostic_answer_submissions a ON a.question_instance_id=qi.id
+             WHERE qi.session_id=s.id AND a.id IS NULL ORDER BY qi.ordinal DESC LIMIT 1
+           ) q ON true WHERE s.id=$1`,
+          [current.data.diagnosticSessionId],
+        );
+        const session = canonical.rows[0];
+        if (session) {
+          const question =
+            session.question_instance_id && session.public_payload
+              ? {
+                  questionInstanceId: session.question_instance_id,
+                  sessionRevision: Number(session.public_payload.session_revision),
+                  publicQuestion: session.public_payload,
+                }
+              : undefined;
+          current = {
+            ...current,
+            state:
+              session.status === 'COMPLETED' || session.status === 'COMPLETED_PARTIAL'
+                ? 'RESULT'
+                : session.status === 'PAUSED'
+                  ? 'PAUSED'
+                  : 'DIAGNOSIS',
+            data: {
+              ...current.data,
+              answerCount: session.question_count,
+              questionIndex: session.question_count,
+              additionalConsent: session.additional_consent_at !== null,
+              awaitingAdditionalConsent:
+                session.status === 'IN_PROGRESS' &&
+                session.question_count >= 8 &&
+                session.additional_consent_at === null,
+              canonicalQuestion: question,
+              ...(session.status === 'COMPLETED' || session.status === 'COMPLETED_PARTIAL'
+                ? { finishDiagnostic: true }
+                : {}),
+            },
+          };
+        }
       }
       const updated = apply(current);
       await client.query(
         `INSERT INTO bot_conversations(id, actor_id_hash, state, revision, data) VALUES ($1,$2,$3,$4,$5) ON CONFLICT(actor_id_hash) DO UPDATE SET state = EXCLUDED.state, revision = EXCLUDED.revision, data = EXCLUDED.data`,
         [updated.id, actorHash, updated.state, updated.revision, updated.data],
       );
-      await client.query('COMMIT');
+      if (ownsTransaction) await client.query('COMMIT');
       return { conversation: updated, duplicate: false };
     } catch (error) {
-      await client.query('ROLLBACK');
+      if (ownsTransaction) await client.query('ROLLBACK');
       throw error;
     } finally {
-      client.release();
+      if (ownsTransaction) client.release();
     }
   }
   async saveProblem(
@@ -1116,18 +1293,60 @@ export class PostgresBotRepository implements BotRepository {
     profile: MinimumDiagnosticProfile,
   ): Promise<{ sessionId?: string }> {
     const userId = await this.userIdForActor(actorId);
-    const created = await new PostgresProblemDiagnosticRepository(this.pool).createConfirmedSession(
-      {
-        userId,
-        rawText,
-        classification: interpretation,
-        profile,
-      },
-    );
-    return { sessionId: created.sessionId };
+    const created = await new PostgresProblemDiagnosticRepository(
+      this.pool,
+      this.transactionClient,
+    ).createConfirmedSession({
+      userId,
+      rawText,
+      classification: interpretation,
+      profile,
+    });
+    const issued = await this.diagnostics.issueNext({
+      sessionId: created.sessionId,
+      userId,
+    });
+    return {
+      sessionId: created.sessionId,
+      ...(issued.kind === 'QUESTION' ? { question: issued } : {}),
+    };
   }
-  async grantAdditionalConsent(actorId: string, sessionId: string): Promise<void> {
-    await new PostgresDiagnosticSessionRepository(this.pool).grantAdditionalConsent({
+  async grantAdditionalConsent(actorId: string, sessionId: string) {
+    return this.diagnostics.grantAdditionalConsentAndIssue({
+      sessionId,
+      userId: await this.userIdForActor(actorId),
+    });
+  }
+  async finishDiagnostic(
+    actorId: string,
+    sessionId: string,
+    reason: 'USER_FINISHED' | 'PAUSED',
+  ): Promise<DiagnosticResult | undefined> {
+    const userId = await this.userIdForActor(actorId);
+    const status = await this.db.query<{ status: string }>(
+      'SELECT status FROM diagnostic_sessions WHERE id=$1 AND user_id=$2',
+      [sessionId, userId],
+    );
+    if (status.rows[0]?.status !== 'IN_PROGRESS') {
+      const existing = await this.db.query<{ payload: DiagnosticResult }>(
+        `SELECT r.payload FROM diagnostic_results r
+         JOIN diagnostic_sessions s ON s.id=r.session_id
+         WHERE r.session_id=$1 AND s.user_id=$2 ORDER BY r.created_at DESC LIMIT 1`,
+        [sessionId, userId],
+      );
+      return existing.rows[0]?.payload;
+    }
+    const finished = await this.diagnostics.finish({
+      sessionId,
+      userId,
+      policies: [],
+      stoppingReason: reason,
+      evaluatedAt: new Date().toISOString(),
+    });
+    return finished.result;
+  }
+  async resumeDiagnostic(actorId: string, sessionId: string): Promise<void> {
+    await this.diagnostics.resume({
       sessionId,
       userId: await this.userIdForActor(actorId),
     });
@@ -1139,17 +1358,50 @@ export class PostgresBotRepository implements BotRepository {
     kind: 'CHOICE' | 'TEXT' | 'SKIP' | 'DONT_KNOW';
     value: string[] | string | null;
     diagnosticSessionId?: string;
-  }): Promise<boolean> {
+    questionInstanceId?: string;
+    sessionRevision?: number;
+  }): Promise<{
+    created: boolean;
+    question?: {
+      questionInstanceId: string;
+      sessionRevision: number;
+      publicQuestion: Record<string, unknown>;
+    };
+    stoppedReason?: string;
+  }> {
     if (input.diagnosticSessionId) {
-      await new PostgresDiagnosticSessionRepository(this.pool).saveAnswer({
+      const sessionRevision = input.sessionRevision;
+      if (
+        !input.questionInstanceId ||
+        typeof sessionRevision !== 'number' ||
+        !Number.isInteger(sessionRevision)
+      )
+        throw new Error('Canonical diagnostic question reference is required');
+      const userId = await this.userIdForActor(input.actorId);
+      const progress = await this.diagnostics.answerAndIssue({
         sessionId: input.diagnosticSessionId,
-        userId: await this.userIdForActor(input.actorId),
+        userId,
+        questionInstanceId: input.questionInstanceId,
+        expectedRevision: sessionRevision,
+        idempotencyKey: input.idempotencyKey,
         kind: input.kind,
         value: input.value,
       });
-      return true;
+      return progress.questionInstanceId
+        ? {
+            created: progress.created,
+            question: {
+              questionInstanceId: progress.questionInstanceId,
+              sessionRevision: progress.sessionRevision,
+              publicQuestion: progress.publicQuestion ?? {},
+            },
+          }
+        : {
+            created: progress.created,
+            ...(progress.stoppedReason ? { stoppedReason: progress.stoppedReason } : {}),
+          };
     }
-    const result = await this.pool.query(
+    const result = await this.db.query(
       `INSERT INTO bot_answer_submissions(id, actor_id_hash, question_id, idempotency_key, answer_kind, answer_value) VALUES ($1,$2,$3,$4,$5,$6) ON CONFLICT DO NOTHING`,
       [
         newUuid(),
@@ -1160,7 +1412,7 @@ export class PostgresBotRepository implements BotRepository {
         input.value,
       ],
     );
-    return result.rowCount === 1;
+    return { created: result.rowCount === 1 };
   }
   async saveAttempt(input: {
     actorId: string;
@@ -1168,19 +1420,55 @@ export class PostgresBotRepository implements BotRepository {
     answer: string;
     assistance: 'NONE' | 'SOLUTION';
   }): Promise<{ id: AttemptId; created: boolean }> {
-    const result = await this.pool.query<{ id: AttemptId }>(
-      `INSERT INTO bot_attempts(id, actor_id_hash, idempotency_key, answer_text, independent_pass_eligible) VALUES ($1,$2,$3,$4,$5) ON CONFLICT(actor_id_hash, idempotency_key) DO NOTHING RETURNING id`,
+    const userId = await this.userIdForActor(input.actorId);
+    const rubric = await this.db.query<{ id: string }>(
+      `SELECT id::text FROM content_catalog_versions
+       WHERE kind='RUBRIC' AND logical_id='demo-rubric' AND status='PUBLISHED'
+       ORDER BY version DESC LIMIT 1`,
+    );
+    const rubricVersion = rubric.rows[0]?.id;
+    if (!rubricVersion) throw new Error('Published rubric is required');
+    const result = await this.db.query<{ id: AttemptId }>(
+      `INSERT INTO bot_attempts(id, actor_id_hash, idempotency_key, answer_text, rubric_version,
+        independent_pass_eligible) VALUES ($1,$2,$3,$4,$5,$6)
+       ON CONFLICT(actor_id_hash, idempotency_key) DO NOTHING RETURNING id`,
       [
         newUuid<AttemptId>(),
         actorDigest(input.actorId),
         actorDigest(input.key),
         input.answer,
+        rubricVersion,
         input.assistance === 'NONE',
       ],
     );
     const created = result.rows[0];
-    if (created) return { id: created.id, created: true };
-    const existing = await this.pool.query<{ id: AttemptId }>(
+    if (created) {
+      await this.db.query(
+        `INSERT INTO attempts(id,user_id,route_id,task_version_id,rubric_version,assistance_level,
+          independent_pass_eligible,answer_payload,idempotency_key)
+         VALUES ($1,$2,(SELECT id FROM learning_routes WHERE user_id=$2 AND status='ACTIVE'),
+          (SELECT id::text FROM content_catalog_versions WHERE kind='TASK_TEMPLATE' AND logical_id='demo-task' AND status='PUBLISHED' ORDER BY version DESC LIMIT 1),
+          $7,
+          $3,$4,$5,$6)`,
+        [
+          created.id,
+          userId,
+          input.assistance,
+          input.assistance === 'NONE',
+          { text: input.answer },
+          actorDigest(input.key),
+          rubricVersion,
+        ],
+      );
+      await this.db.query(
+        `INSERT INTO review_versions(id,attempt_id,version,rubric_version,status,payload)
+         VALUES ($1,$2,1,
+          $3,'PENDING',$4)`,
+        [newUuid(), created.id, rubricVersion, { reason: 'DETERMINISTIC_REVIEW_PENDING' }],
+      );
+      return { id: created.id, created: true };
+    }
+    const existing = await this.db.query<{ id: AttemptId }>(
       `SELECT id FROM bot_attempts WHERE actor_id_hash = $1 AND idempotency_key = $2`,
       [actorDigest(input.actorId), actorDigest(input.key)],
     );
@@ -1194,34 +1482,82 @@ export class PostgresBotRepository implements BotRepository {
       });
     return { id: previous.id, created: false };
   }
-  async saveGoal(actorId: string, text: string): Promise<boolean> {
-    const actorHash = actorDigest(actorId);
-    const result = await this.pool.query(
-      `INSERT INTO bot_goals(id, actor_id_hash, version, text) VALUES ($1,$2,(SELECT COALESCE(MAX(version),0)+1 FROM bot_goals WHERE actor_id_hash=$2),$3) ON CONFLICT(actor_id_hash, version) DO NOTHING`,
-      [newUuid(), actorHash, text],
+  async saveDispute(actorId: string, attemptId: string, reason: string): Promise<boolean> {
+    const userId = await this.userIdForActor(actorId);
+    const disputeId = newUuid();
+    const result = await this.db.query(
+      `INSERT INTO disputes(id,user_id,attempt_id,reason)
+       SELECT $1,$2,a.id,$4 FROM attempts a WHERE a.id=$3 AND a.user_id=$2`,
+      [disputeId, userId, attemptId, reason],
     );
+    if (result.rowCount === 1)
+      await this.db.query(
+        `INSERT INTO bot_disputes(id,attempt_id,status) VALUES ($1,$2,'OPEN') ON CONFLICT DO NOTHING`,
+        [disputeId, attemptId],
+      );
     return result.rowCount === 1;
   }
-  async saveConsent(actorId: string, version: string): Promise<void> {
-    await this.pool.query(
-      `INSERT INTO bot_consents(id, actor_id_hash, document_version) VALUES ($1,$2,$3) ON CONFLICT DO NOTHING`,
-      [newUuid(), actorDigest(actorId), version],
+  async saveGoal(actorId: string, text: string): Promise<boolean> {
+    const actorHash = actorDigest(actorId);
+    const userId = await this.userIdForActor(actorId);
+    const goalId = newUuid();
+    const result = await this.db.query(
+      `INSERT INTO bot_goals(id, actor_id_hash, version, text) VALUES ($1,$2,(SELECT COALESCE(MAX(version),0)+1 FROM bot_goals WHERE actor_id_hash=$2),$3) ON CONFLICT(actor_id_hash, version) DO NOTHING`,
+      [goalId, actorHash, text],
     );
+    if (result.rowCount === 1)
+      await this.db.query(
+        `INSERT INTO goals(id,user_id,payload,version)
+         VALUES ($1,$2,$3,(SELECT COALESCE(MAX(version),0)+1 FROM goals WHERE user_id=$2))`,
+        [goalId, userId, { text, source: 'MAX_BOT' }],
+      );
+    return result.rowCount === 1;
+  }
+  async saveConsent(actorId: string, version: string, age: number): Promise<void> {
+    const userId = await this.userIdForActor(actorId);
+    const client = this.transactionClient ?? (await this.pool.connect());
+    const ownsTransaction = this.transactionClient === undefined;
+    try {
+      if (ownsTransaction) await client.query('BEGIN');
+      await client.query(
+        `INSERT INTO profile_versions(id,user_id,version,payload)
+         VALUES ($1,$2,(SELECT COALESCE(MAX(version),0)+1 FROM profile_versions WHERE user_id=$2),$3)`,
+        [newUuid(), userId, { age }],
+      );
+      await client.query(
+        `INSERT INTO consents(id,user_id,consent_type,document_version,granted,occurred_at)
+         VALUES ($1,$2,'PERSONAL_DATA',$3,true,now())
+         ON CONFLICT(user_id,consent_type,document_version)
+         DO UPDATE SET granted=true,occurred_at=now(),version=consents.version+1`,
+        [newUuid(), userId, version],
+      );
+      await client.query(
+        `INSERT INTO bot_consents(id, actor_id_hash, document_version)
+         VALUES ($1,$2,$3) ON CONFLICT DO NOTHING`,
+        [newUuid(), actorDigest(actorId), version],
+      );
+      if (ownsTransaction) await client.query('COMMIT');
+    } catch (error) {
+      if (ownsTransaction) await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      if (ownsTransaction) client.release();
+    }
   }
   async recordStepOpened(actorId: string, stepId: string, position: number): Promise<boolean> {
     const actorHash = actorDigest(actorId);
-    const result = await this.pool.query(
+    const result = await this.db.query(
       `INSERT INTO bot_step_open_events(actor_id_hash, step_id, position) VALUES ($1,$2,$3) ON CONFLICT DO NOTHING`,
       [actorHash, stepId, position],
     );
-    await this.pool.query(
+    await this.db.query(
       `INSERT INTO bot_learning_state(actor_id_hash, current_step_id, position, version) VALUES ($1,$2,$3,1) ON CONFLICT(actor_id_hash) DO UPDATE SET current_step_id=EXCLUDED.current_step_id, position=EXCLUDED.position, version=bot_learning_state.version+1, updated_at=now()`,
       [actorHash, stepId, position],
     );
     return result.rowCount === 1;
   }
   async saveNotification(eventId: string): Promise<boolean> {
-    const result = await this.pool.query(
+    const result = await this.db.query(
       `INSERT INTO bot_notification_events(event_id, actor_id_hash) VALUES ($1,$2) ON CONFLICT DO NOTHING`,
       [eventId, actorDigest('notification')],
     );
@@ -1230,6 +1566,9 @@ export class PostgresBotRepository implements BotRepository {
 }
 
 export function actorDigest(value: string): string {
+  // Worker storage already exposes only the provider identity digest. Keeping
+  // an existing digest stable makes bot and mini-app resolve the same user.
+  if (/^[a-f0-9]{64}$/i.test(value)) return value.toLowerCase();
   return createHash('sha256').update(value).digest('hex');
 }
 export function assertValidOpaqueCallback(value: string): void {

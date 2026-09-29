@@ -9,11 +9,11 @@
 
 ## Models
 
-| Model | URI state | Note |
-| --- | --- | --- |
-| Alice AI LLM Flash | UNAVAILABLE | Missing YANDEX_MODEL_ALICE_FLASH_URI; account/catalog access is unconfirmed. |
-| Alice AI LLM | UNAVAILABLE | Missing YANDEX_MODEL_ALICE_URI; account/catalog access is unconfirmed. |
-| YandexGPT Pro 5.1 | UNAVAILABLE | Missing YANDEX_MODEL_YANDEXGPT_PRO_5_1_URI; account/catalog access is unconfirmed. |
+| Model              | URI state   | Note                                                                               |
+| ------------------ | ----------- | ---------------------------------------------------------------------------------- |
+| Alice AI LLM Flash | UNAVAILABLE | Missing YANDEX_MODEL_ALICE_FLASH_URI; account/catalog access is unconfirmed.       |
+| Alice AI LLM       | UNAVAILABLE | Missing YANDEX_MODEL_ALICE_URI; account/catalog access is unconfirmed.             |
+| YandexGPT Pro 5.1  | UNAVAILABLE | Missing YANDEX_MODEL_YANDEXGPT_PRO_5_1_URI; account/catalog access is unconfirmed. |
 
 ## Rejection thresholds
 
